@@ -1,0 +1,6 @@
+#!/bin/bash
+
+ORIGIN="$(dirname -- "${BASH_SOURCE[0]}")"
+ORIGIN="$(realpath "$ORIGIN")"
+
+exec clang --config="$ORIGIN/clang.cfg" "$@"

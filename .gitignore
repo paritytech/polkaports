@@ -1,0 +1,4 @@
+sysroot
+*.o
+*.elf
+*.polkavm
