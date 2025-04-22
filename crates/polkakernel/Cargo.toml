@@ -1,0 +1,18 @@
+[package]
+name = "polkakernel"
+description = "Linux syscall abstraction layer for PolkaVM/CoreVM"
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+version.workspace = true
+
+[features]
+default = []
+std = ["log/std", "polkavm/std"]
+# Provide PolkaVM-based implementation of the kernel subsystems.
+polkavm-impl = []
+
+[dependencies]
+log = { version = "0.4.27", features = [], default-features = false }
+polkavm = { version = "0.23.0", features = [], default-features = false }
