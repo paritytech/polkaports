@@ -1,6 +1,12 @@
-use polkavm::{ProgramCounter, RawInstance, Reg};
+use polkavm::{ProgramCounter, RawInstance};
 
-use crate::{Machine, MachineError, MachineError::*};
+use crate::{Machine, MachineError, MachineError::*, Reg};
+
+impl From<Reg> for polkavm::Reg {
+	fn from(other: Reg) -> Self {
+		unsafe { core::mem::transmute(other) }
+	}
+}
 
 impl Machine for RawInstance {
 	fn program_counter(&self) -> u64 {
@@ -16,11 +22,11 @@ impl Machine for RawInstance {
 	}
 
 	fn reg(&self, name: Reg) -> u64 {
-		RawInstance::reg(self, name)
+		RawInstance::reg(self, name.into())
 	}
 
 	fn set_reg(&mut self, name: Reg, value: u64) {
-		RawInstance::set_reg(self, name, value);
+		RawInstance::set_reg(self, name.into(), value);
 	}
 
 	fn read_u64(&self, address: u64) -> Result<u64, MachineError> {

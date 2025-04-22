@@ -1,5 +1,4 @@
 use alloc::{ffi::CString, vec::Vec};
-use polkavm::Reg;
 
 use MachineError::*;
 
@@ -71,3 +70,22 @@ impl core::fmt::Display for MachineError {
 
 #[cfg(feature = "std")]
 impl std::error::Error for MachineError {}
+
+/// Available registers.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[repr(u32)]
+pub enum Reg {
+	RA = 0,
+	SP = 1,
+	T0 = 2,
+	T1 = 3,
+	T2 = 4,
+	S0 = 5,
+	S1 = 6,
+	A0 = 7,
+	A1 = 8,
+	A2 = 9,
+	A3 = 10,
+	A4 = 11,
+	A5 = 12,
+}

@@ -1,9 +1,7 @@
 use alloc::{collections::BTreeMap, sync::Arc};
 use core::ffi::CStr;
 
-use polkavm::Reg;
-
-use crate::{libc::*, Environment, File, FileSystem, Machine, MachineError};
+use crate::{libc::*, Environment, File, FileSystem, Machine, MachineError, Reg};
 
 use SyscallOutcome::*;
 
