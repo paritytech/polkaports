@@ -1,21 +1,21 @@
 use alloc::{collections::BTreeMap, sync::Arc};
 use core::ffi::CStr;
 
-use crate::{libc::*, Environment, File, FileSystem, Machine, MachineError, Reg};
+use crate::{libc::*, Environment, FileBlob, FileSystem, Machine, MachineError, Reg};
 
 use SyscallOutcome::*;
 
 pub struct Kernel<M: Machine, E: Environment, F: FileSystem> {
 	machine: M,
 	env: E,
-	file_system: F,
+	fs: F,
 	fds: BTreeMap<u64, Fd>,
 	next_fd: u64,
 }
 
 impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
-	pub fn new(machine: M, env: E, file_system: F) -> Self {
-		Self { machine, env, file_system, fds: BTreeMap::new(), next_fd: 3 }
+	pub fn new(machine: M, env: E, fs: F) -> Self {
+		Self { machine, env, fs, fds: BTreeMap::new(), next_fd: 3 }
 	}
 
 	pub fn machine(&self) -> &M {
@@ -34,6 +34,14 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 		&mut self.env
 	}
 
+	pub fn fs(&self) -> &F {
+		&self.fs
+	}
+
+	pub fn fs_mut(&mut self) -> &mut F {
+		&mut self.fs
+	}
+
 	pub fn into_inner(self) -> (M, E) {
 		(self.machine, self.env)
 	}
@@ -41,6 +49,7 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 	pub fn init<'argv, 'envp, I1, I2>(
 		&mut self,
 		default_sp: u64,
+		default_ra: u64,
 		start: u64,
 		argv: I1,
 		envp: I2,
@@ -94,7 +103,7 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 
 		self.machine.set_reg(Reg::SP, sp);
 		self.machine.set_reg(Reg::A0, address_init);
-		self.machine.set_reg(Reg::RA, polkavm::RETURN_TO_HOST);
+		self.machine.set_reg(Reg::RA, default_ra);
 		self.machine.set_next_program_counter(start);
 		Ok(())
 	}
@@ -158,7 +167,7 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 	fn handle_open(&mut self, path: &CStr, flags: u64) -> u64 {
 		log::debug!("Open: path={:?}, flags={:#o}", path, flags);
 
-		if let Some(file) = self.file_system.read_file(path) {
+		if let Some(file) = self.fs.read_file(path) {
 			if (flags & (O_WRONLY | O_RDWR)) != 0 {
 				log::trace!("  -> EACCES");
 				return errno(EACCES);
@@ -212,13 +221,13 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 			return errno(EFAULT);
 		}
 
-		let end = core::cmp::min(fd.position.wrapping_add(length), fd.file.blob.len() as u64);
-		if fd.position >= end || fd.position >= fd.file.blob.len() as u64 {
+		let end = core::cmp::min(fd.position.wrapping_add(length), fd.file.len() as u64);
+		if fd.position >= end || fd.position >= fd.file.len() as u64 {
 			log::trace!("  -> offset={}, length=0", fd.position);
 			return 0;
 		}
 
-		let blob = &fd.file.blob[fd.position as usize..end as usize];
+		let blob = &fd.file[fd.position as usize..end as usize];
 		match self.machine.write_memory(address, blob) {
 			Ok(()) => {},
 			Err(MachineError::BadAddress) => {
@@ -327,13 +336,13 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 			SEEK_CUR => {
 				fd.position = core::cmp::min(
 					(fd.position as i64).wrapping_add(offset) as u64,
-					fd.file.blob.len() as u64,
+					fd.file.len() as u64,
 				);
 			},
 			SEEK_END => {
 				fd.position = core::cmp::min(
-					(fd.file.blob.len() as i64).wrapping_add(offset) as u64,
-					fd.file.blob.len() as u64,
+					(fd.file.len() as i64).wrapping_add(offset) as u64,
+					fd.file.len() as u64,
 				);
 			},
 			_ => {
@@ -354,6 +363,6 @@ pub enum SyscallOutcome {
 }
 
 struct Fd {
-	file: Arc<File>,
+	file: Arc<FileBlob>,
 	position: u64,
 }

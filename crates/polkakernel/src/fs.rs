@@ -3,31 +3,19 @@ use core::ffi::CStr;
 
 // TODO @ivan Support proper file trees.
 pub trait FileSystem {
-	fn read_file(&self, path: &CStr) -> Option<Arc<File>>;
+	fn read_file(&self, path: &CStr) -> Option<Arc<FileBlob>>;
 	fn write_file(&mut self, path: &CStr, data: FileBlob);
 }
 
-pub type InMemoryFileSystem = BTreeMap<CString, Arc<File>>;
+pub type InMemoryFileSystem = BTreeMap<CString, Arc<FileBlob>>;
 
 impl FileSystem for InMemoryFileSystem {
-	fn read_file(&self, path: &CStr) -> Option<Arc<File>> {
+	fn read_file(&self, path: &CStr) -> Option<Arc<FileBlob>> {
 		Self::get(self, path).cloned()
 	}
 
-	fn write_file(&mut self, path: &CStr, data: FileBlob) {
-		let file = File { blob: data };
+	fn write_file(&mut self, path: &CStr, file: FileBlob) {
 		self.insert(path.into(), Arc::new(file));
-	}
-}
-
-// TODO flatten?
-pub struct File {
-	pub(crate) blob: FileBlob,
-}
-
-impl File {
-	pub fn from_blob(blob: FileBlob) -> Self {
-		Self { blob }
 	}
 }
 
@@ -38,7 +26,7 @@ pub struct StdFileSystem;
 
 #[cfg(feature = "std")]
 impl FileSystem for StdFileSystem {
-	fn read_file(&self, path: &CStr) -> Option<Arc<File>> {
+	fn read_file(&self, path: &CStr) -> Option<Arc<FileBlob>> {
 		use std::{ffi::OsStr, os::unix::ffi::OsStrExt, path::Path};
 		let path = Path::new(OsStr::from_bytes(path.to_bytes()));
 		let data = match std::fs::read(path) {
@@ -48,8 +36,7 @@ impl FileSystem for StdFileSystem {
 				panic!("Failed to read file {path:?}: {e}");
 			},
 		};
-		let file = File { blob: data.into() };
-		Some(Arc::new(file))
+		Some(Arc::new(data.into()))
 	}
 
 	fn write_file(&mut self, path: &CStr, data: FileBlob) {
