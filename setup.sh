@@ -26,7 +26,8 @@ cd ../..
 
 cp libs/musl/lib/*.a sysroot/lib
 cp libs/musl/lib/*.o sysroot/lib
-cp libs/musl/libclang_rt.builtins-riscv64.a sysroot/lib
+ln -f libs/musl/libclang_rt.builtins-riscv64.a sysroot/lib/libclang_rt.builtins-riscv64.a
+ln -f libs/musl/libclang_rt.builtins-riscv64.a sysroot/lib/libclang_rt.builtins.a
 ar r sysroot/lib/libc.a sysroot/tmp/picoalloc*.o
 
 mkdir -p sysroot/include
