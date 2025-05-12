@@ -10,8 +10,6 @@ cd libs/musl
 make -j
 cd ../..
 
-exit
-
 cd quake
 make -j
 cd ..
