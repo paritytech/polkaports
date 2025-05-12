@@ -4,3 +4,5 @@ CFLAGS=-Wno-shift-op-parentheses -Wno-unused-command-line-argument -fpic -fPIE -
 CC=clang
 LIBCC=
 LDFLAGS=libclang_rt.builtins-riscv64.a -Wl,--emit-relocs -Wl,--no-relax
+AR=llvm-ar
+RANLIB=llvm-ranlib

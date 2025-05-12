@@ -70,7 +70,7 @@ QUAKE_OBJS = \
 	$(OUTPUT)/pr_exec.o
 
 $(OUTPUT)/quake.polkavm : $(OUTPUT)/quake.elf
-	polkatool link $(OUTPUT)/quake --output $(OUTPUT)/quake.polkavm --min-stack-size 524288
+	polkatool link $(OUTPUT)/quake.elf --output $(OUTPUT)/quake.polkavm --min-stack-size 524288
 
 $(OUTPUT)/quake.elf : $(QUAKE_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(QUAKE_OBJS)
