@@ -46,68 +46,6 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 		(self.machine, self.env)
 	}
 
-	pub fn init<'argv, 'envp, I1, I2>(
-		&mut self,
-		default_sp: u64,
-		default_ra: u64,
-		start: u64,
-		argv: I1,
-		envp: I2,
-	) -> Result<(), MachineError>
-	where
-		I1: IntoIterator<Item = &'argv CStr>,
-		<I1 as IntoIterator>::IntoIter: ExactSizeIterator,
-		I2: IntoIterator<Item = &'envp CStr>,
-		<I2 as IntoIterator>::IntoIter: ExactSizeIterator,
-	{
-		let argv = argv.into_iter();
-		let argc = argv.len() as u64;
-		let envp = envp.into_iter();
-		let envp_len = envp.len() as u64;
-		let auxv: &[(u64, u64)] = &[(AT_PAGESZ, 4096)];
-		let auxv_len = auxv.len() as u64;
-
-		let mut sp = default_sp;
-
-		sp -= (1 + argc + 1 + envp_len + 1 + (auxv_len + 1) * 2) * 8;
-		let address_init = sp;
-
-		let mut p = sp;
-		self.machine.write_u64(p, argc)?;
-		p += 8;
-
-		for arg in argv {
-			let bytes = arg.to_bytes();
-			sp -= bytes.len() as u64 + 1;
-			self.machine.write_memory(sp, bytes)?;
-			self.machine.write_u64(p, sp)?;
-			p += 8;
-		}
-		p += 8; // Null pointer.
-
-		for arg in envp {
-			let bytes = arg.to_bytes();
-			sp -= bytes.len() as u64 + 1;
-			self.machine.write_memory(sp, bytes)?;
-			self.machine.write_u64(p, sp)?;
-			p += 8;
-		}
-		p += 8; // Null pointer.
-
-		for &(key, value) in auxv {
-			self.machine.write_u64(p, key)?;
-			p += 8;
-			self.machine.write_u64(p, value)?;
-			p += 8;
-		}
-
-		self.machine.set_reg(Reg::SP, sp);
-		self.machine.set_reg(Reg::A0, address_init);
-		self.machine.set_reg(Reg::RA, default_ra);
-		self.machine.set_next_program_counter(start);
-		Ok(())
-	}
-
 	pub fn handle_syscall(&mut self) -> Result<SyscallOutcome, MachineError> {
 		let syscall = self.machine.reg(Reg::A0);
 		let a1 = self.machine.reg(Reg::A1);
@@ -115,9 +53,8 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 		let a3 = self.machine.reg(Reg::A3);
 		let a4 = self.machine.reg(Reg::A4);
 		let a5 = self.machine.reg(Reg::A5);
-		let pc = self.machine.program_counter();
 		log::trace!(
-			"Syscall at pc={pc}: {syscall:>3}, \
+			"Syscall: {syscall:>3}, \
             args = [0x{a1:>016x}, 0x{a2:>016x}, 0x{a3:>016x}, 0x{a4:>016x}, 0x{a5:>016x}]"
 		);
 		match syscall {
@@ -155,7 +92,7 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 			},
 			_ => {
 				log::debug!(
-					"Unimplemented syscall at pc={pc}: {syscall:>3}, \
+					"Unimplemented syscall: {syscall:>3}, \
                     args = [0x{a1:>016x}, 0x{a2:>016x}, 0x{a3:>016x}, 0x{a4:>016x}, 0x{a5:>016x}]"
 				);
 				self.machine.set_reg(Reg::A0, errno(ENOSYS));
