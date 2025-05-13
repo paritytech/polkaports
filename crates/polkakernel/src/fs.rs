@@ -3,14 +3,14 @@ use core::ffi::CStr;
 
 // TODO @ivan Support proper file trees.
 pub trait FileSystem {
-	fn read_file(&self, path: &CStr) -> Option<Arc<FileBlob>>;
+	fn read_file(&mut self, path: &CStr) -> Option<Arc<FileBlob>>;
 	fn write_file(&mut self, path: &CStr, data: FileBlob);
 }
 
 pub type InMemoryFileSystem = BTreeMap<CString, Arc<FileBlob>>;
 
 impl FileSystem for InMemoryFileSystem {
-	fn read_file(&self, path: &CStr) -> Option<Arc<FileBlob>> {
+	fn read_file(&mut self, path: &CStr) -> Option<Arc<FileBlob>> {
 		Self::get(self, path).cloned()
 	}
 
@@ -26,7 +26,7 @@ pub struct StdFileSystem;
 
 #[cfg(feature = "std")]
 impl FileSystem for StdFileSystem {
-	fn read_file(&self, path: &CStr) -> Option<Arc<FileBlob>> {
+	fn read_file(&mut self, path: &CStr) -> Option<Arc<FileBlob>> {
 		use std::{ffi::OsStr, os::unix::ffi::OsStrExt, path::Path};
 		let path = Path::new(OsStr::from_bytes(path.to_bytes()));
 		let data = match std::fs::read(path) {

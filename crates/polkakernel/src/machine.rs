@@ -1,18 +1,79 @@
 use alloc::{ffi::CString, vec::Vec};
+use core::ffi::CStr;
+
+use crate::libc::*;
 
 use MachineError::*;
 
 pub trait Machine {
-	fn program_counter(&self) -> u64;
-	fn set_next_program_counter(&mut self, pc: u64);
+	fn init<'argv, 'envp, I1, I2>(
+		&mut self,
+		default_sp: u64,
+		default_ra: u64,
+		argv: I1,
+		envp: I2,
+	) -> Result<(), MachineError>
+	where
+		I1: IntoIterator<Item = &'argv CStr>,
+		<I1 as IntoIterator>::IntoIter: ExactSizeIterator,
+		I2: IntoIterator<Item = &'envp CStr>,
+		<I2 as IntoIterator>::IntoIter: ExactSizeIterator,
+	{
+		let argv = argv.into_iter();
+		let argc = argv.len() as u64;
+		let envp = envp.into_iter();
+		let envp_len = envp.len() as u64;
+		let auxv: &[(u64, u64)] = &[(AT_PAGESZ, 4096)];
+		let auxv_len = auxv.len() as u64;
+
+		let mut sp = default_sp;
+
+		sp -= (1 + argc + 1 + envp_len + 1 + (auxv_len + 1) * 2) * 8;
+		let address_init = sp;
+		self.touch_memory(address_init, default_sp)?;
+
+		let mut p = sp;
+		self.write_u64(p, argc)?;
+		p += 8;
+
+		for arg in argv {
+			let bytes = arg.to_bytes();
+			sp -= bytes.len() as u64 + 1;
+			self.write_memory(sp, bytes)?;
+			self.write_u64(p, sp)?;
+			p += 8;
+		}
+		p += 8; // Null pointer.
+
+		for arg in envp {
+			let bytes = arg.to_bytes();
+			sp -= bytes.len() as u64 + 1;
+			self.write_memory(sp, bytes)?;
+			self.write_u64(p, sp)?;
+			p += 8;
+		}
+		p += 8; // Null pointer.
+
+		for &(key, value) in auxv {
+			self.write_u64(p, key)?;
+			p += 8;
+			self.write_u64(p, value)?;
+			p += 8;
+		}
+
+		self.set_reg(Reg::SP, sp);
+		self.set_reg(Reg::A0, address_init);
+		self.set_reg(Reg::RA, default_ra);
+		Ok(())
+	}
 
 	fn reg(&self, name: Reg) -> u64;
 	fn set_reg(&mut self, name: Reg, value: u64);
 
-	fn read_u64(&self, address: u64) -> Result<u64, MachineError>;
-	fn read_u32(&self, address: u64) -> Result<u32, MachineError>;
-	fn read_u16(&self, address: u64) -> Result<u16, MachineError>;
-	fn read_u8(&self, address: u64) -> Result<u8, MachineError>;
+	fn read_u64(&mut self, address: u64) -> Result<u64, MachineError>;
+	fn read_u32(&mut self, address: u64) -> Result<u32, MachineError>;
+	fn read_u16(&mut self, address: u64) -> Result<u16, MachineError>;
+	fn read_u8(&mut self, address: u64) -> Result<u8, MachineError>;
 
 	/// Read C-string from the provided address.
 	///
@@ -36,9 +97,9 @@ pub trait Machine {
 		Err(BadAddress)
 	}
 
-	fn read_memory_into(&self, address: u64, buffer: &mut [u8]) -> Result<(), MachineError>;
+	fn read_memory_into(&mut self, address: u64, buffer: &mut [u8]) -> Result<(), MachineError>;
 
-	fn read_memory(&self, address: u64, length: u64) -> Result<Vec<u8>, MachineError> {
+	fn read_memory(&mut self, address: u64, length: u64) -> Result<Vec<u8>, MachineError> {
 		let Ok(len) = length.try_into() else {
 			return Err(BadAddress);
 		};
@@ -55,6 +116,8 @@ pub trait Machine {
 
 	fn write_u64(&mut self, address: u64, value: u64) -> Result<(), MachineError>;
 	fn write_memory(&mut self, address: u64, slice: &[u8]) -> Result<(), MachineError>;
+
+	fn touch_memory(&mut self, start_address: u64, end_address: u64) -> Result<(), MachineError>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
