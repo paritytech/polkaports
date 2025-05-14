@@ -8,9 +8,10 @@ extern crate alloc;
 extern crate std;
 
 mod env;
+mod error;
 mod fs;
 mod kernel;
-mod libc;
+pub mod libc;
 mod machine;
 
-pub use self::{env::*, fs::*, kernel::*, machine::*};
+pub use self::{env::*, error::*, fs::*, kernel::*, machine::*};
