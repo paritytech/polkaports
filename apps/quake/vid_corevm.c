@@ -23,13 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "sound.h"
 #include "client.h"
 
-#include <polkavm_guest.h>
-
-POLKAVM_IMPORT(void, pvm_set_palette, long)
-POLKAVM_IMPORT(void, pvm_display, long, long, long)
-POLKAVM_IMPORT(long, pvm_fetch_inputs, long, long)
-POLKAVM_IMPORT(long, pvm_init_audio, long, long, long)
-POLKAVM_IMPORT(long, pvm_output_audio, long, long)
+#include <corevm_guest.h>
 
 extern viddef_t vid; // global video state
 
@@ -40,8 +34,11 @@ extern viddef_t vid; // global video state
 #define	BASEWIDTH	320
 #define	BASEHEIGHT	200
 
-byte	vid_buffer[BASEWIDTH*BASEHEIGHT];
-short	zbuffer[BASEWIDTH*BASEHEIGHT];
+#define PALETTE_LEN (256 * 3)
+#define FRAME_LEN (BASEWIDTH * BASEHEIGHT)
+
+byte	vid_buffer[1 + PALETTE_LEN + FRAME_LEN];
+short	zbuffer[FRAME_LEN];
 byte	surfcache[256*1024];
 
 unsigned short	d_8to16table[256];
@@ -49,7 +46,8 @@ unsigned	d_8to24table[256];
 
 void	VID_SetPalette (unsigned char *palette)
 {
-    pvm_set_palette((long)palette);
+    vid_buffer[0] = 1;
+    memcpy(vid_buffer + 1, palette, PALETTE_LEN);
 }
 
 void	VID_ShiftPalette (unsigned char *palette)
@@ -65,13 +63,20 @@ void	VID_Init (unsigned char *palette)
 	vid.numpages = 1;
 	memcpy(vid.colormap, host_colormap, 16384);
 	vid.fullbright = 256 - LittleLong (*((int *)vid.colormap + 2048));
-	vid.buffer = vid_buffer;
+	vid.buffer = vid_buffer + 1 + PALETTE_LEN;
 	vid.rowbytes = BASEWIDTH;
 	
 	d_pzbuffer = zbuffer;
 	D_InitCaches (surfcache, sizeof(surfcache));
 
     VID_SetPalette(palette);
+    struct CoreVmVideoMode mode = {
+        .width = vid.width,
+        .height = vid.height,
+        .refresh_rate = 60,
+        .format = COREVM_VIDEO_RGB88_INDEXED8,
+    };
+    corevm_video_mode(&mode);
 }
 
 void	VID_Shutdown (void)
@@ -89,87 +94,14 @@ static float s_mouse_x = 0.0;
 static float s_mouse_y = 0.0;
 static const float MOUSE_SENSITIVITY_X = 0.17;
 static const float MOUSE_SENSITIVITY_Y = 0.15;
+static size_t video_frame_number = 0;
+static size_t audio_frame_number = 0;
 
 void	VID_Update (vrect_t *rects)
 {
-    pvm_display(vid.width, vid.height, (long)vid.buffer);
+    corevm_yield_video_frame(video_frame_number, vid_buffer, 1 + PALETTE_LEN + FRAME_LEN);
+    ++video_frame_number;
     s_timestamp += (1.0 / 60.0);
-
-    while (1) {
-        struct Event events[32];
-        long count = pvm_fetch_inputs((long)&events[0], 32);
-        if (count == 0) {
-            break;
-        }
-
-        for (long i = 0; i < count; ++i) {
-            unsigned char key = 0;
-            switch (events[i].key) {
-                case 0x80 + 0: key = K_UPARROW; break;
-                case 0x80 + 1: key = K_DOWNARROW; break;
-                case 0x80 + 2: key = K_RIGHTARROW; break;
-                case 0x80 + 3: key = K_LEFTARROW; break;
-                case 0x80 + 4: key = K_F1; break;
-                case 0x80 + 5: key = K_F2; break;
-                case 0x80 + 6: key = K_F3; break;
-                case 0x80 + 7: key = K_F4; break;
-                case 0x80 + 8: key = K_F5; break;
-                case 0x80 + 9: key = K_F6; break;
-                case 0x80 + 10: key = K_F7; break;
-                case 0x80 + 11: key = K_F8; break;
-                case 0x80 + 12: key = K_F9; break;
-                case 0x80 + 13: key = K_F10; break;
-                case 0x80 + 14: key = K_F11; break;
-                case 0x80 + 15: key = K_F12; break;
-                case 0x80 + 16: key = K_CAPSLOCK; break;
-                case 0x80 + 17: break;
-                case 0x80 + 18: break;
-                case 0x80 + 19: key = K_PAUSE; break;
-                case 0x80 + 20: key = K_INS; break;
-                case 0x80 + 21: key = K_DEL; break;
-                case 0x80 + 22: key = K_HOME; break;
-                case 0x80 + 23: key = K_END; break;
-                case 0x80 + 24: key = K_PGUP; break;
-                case 0x80 + 25: key = K_PGDN; break;
-                case 0x80 + 26: key = K_SHIFT; break;
-                case 0x80 + 27: key = K_SHIFT; break;
-                case 0x80 + 28: key = K_CTRL; break;
-                case 0x80 + 29: key = K_CTRL; break;
-                case 0x80 + 30: key = K_ALT; break;
-                case 0x80 + 31: key = K_ALT; break;
-                case 0x80 + 32: key = K_MOUSE1; break;
-                case 0x80 + 33: key = K_MOUSE2; break;
-                case 0x80 + 34: key = K_MOUSE3; break;
-                case 0x80 + 35: {
-                    if (!cls.demoplayback) {
-                        s_mouse_x += ((signed char)events[i].value) * MOUSE_SENSITIVITY_X;
-                    }
-                    continue;
-                }
-                case 0x80 + 36: {
-                    if (!cls.demoplayback) {
-                        s_mouse_y += ((signed char)events[i].value) * MOUSE_SENSITIVITY_Y;
-                    }
-                    continue;
-                }
-                case 0x80 + 37: key = K_MWHEELUP; break;
-                case 0x80 + 38: key = K_MWHEELDOWN; break;
-                case '\n': key = K_ENTER; break;
-                case 0x08: key = K_BACKSPACE; break;
-                default:
-                    key = events[i].key;
-                    break;
-            }
-
-            if (key != 0) {
-                Key_Event (key, events[i].value);
-            }
-        }
-
-        if (count < 32) {
-            break;
-        }
-    }
 
     if (cls.demoplayback) {
         return;
@@ -207,12 +139,18 @@ qboolean SNDDMA_Init(void) {
     shm->channels = CHANNELS;
     shm->samplebits = 16;
     shm->speed = SAMPLE_RATE;
-    shm->soundalive = pvm_init_audio(CHANNELS, 16, SAMPLE_RATE);
+    shm->soundalive = 1;
     shm->splitbuffer = false;
     shm->samplepos = 0;
     shm->submission_chunk = 1;
     shm->samples = SAMPLES / (shm->samplebits / 8);
-
+    struct CoreVmAudioMode mode = {
+        .channels = shm->channels,
+        .bits_per_sample = shm->samplebits,
+        .sample_rate = shm->speed,
+        .format = COREVM_AUDIO_S16LE,
+    };
+    corevm_audio_mode(&mode);
     return 1;
 }
 
@@ -329,7 +267,8 @@ void S_RenderSoundFrame(void)
             }
         }
 
-        pvm_output_audio((long)buffer, count);
+        corevm_yield_audio_frame(audio_frame_number, buffer, count);
+        ++audio_frame_number;
         paintedtime += count;
     }
 }
