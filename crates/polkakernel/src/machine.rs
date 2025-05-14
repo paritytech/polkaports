@@ -30,7 +30,6 @@ pub trait Machine {
 
 		sp -= (1 + argc + 1 + envp_len + 1 + (auxv_len + 1) * 2) * 8;
 		let address_init = sp;
-		self.touch_memory(address_init, default_sp)?;
 
 		let mut p = sp;
 		self.write_u64(p, argc)?;
@@ -115,9 +114,8 @@ pub trait Machine {
 	}
 
 	fn write_u64(&mut self, address: u64, value: u64) -> Result<(), MachineError>;
+	fn write_u32(&mut self, address: u64, value: u32) -> Result<(), MachineError>;
 	fn write_memory(&mut self, address: u64, slice: &[u8]) -> Result<(), MachineError>;
-
-	fn touch_memory(&mut self, start_address: u64, end_address: u64) -> Result<(), MachineError>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -133,6 +131,12 @@ impl core::fmt::Display for MachineError {
 
 #[cfg(feature = "std")]
 impl std::error::Error for MachineError {}
+
+impl From<MachineError> for crate::Error {
+	fn from(_e: MachineError) -> Self {
+		Self(EFAULT)
+	}
+}
 
 /// Available registers.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]

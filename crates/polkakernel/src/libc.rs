@@ -36,6 +36,8 @@ pub const SYS_READ: u64 = 63;
 pub const SYS_READV: u64 = 65;
 pub const SYS_WRITE: u64 = 64;
 pub const SYS_WRITEV: u64 = 66;
+pub const SYS_SET_TID_ADDRESS: u64 = 96;
+pub const SYS_IOCTL: u64 = 29;
 
 pub const fn errno(error: u64) -> u64 {
 	(-(error as i64)) as u64
