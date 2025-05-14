@@ -3,7 +3,7 @@
 
 #include "polkavm_guest.h"
 
-POLKAVM_IMPORT_WITH_INDEX(0, long, pvm_syscall, long, long, long, long, long, long, long)
+POLKAVM_IMPORT(long, pvm_syscall, long, long, long, long, long, long, long)
 
 static inline long __syscall0(long n)
 {

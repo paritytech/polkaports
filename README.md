@@ -1,2 +1,31 @@
-1. Run `setup.sh` to build the toolchain.
-2. Run `source activate.sh` to activate it.
+# PolkaVM/CoreVM SDK
+
+This repository contains the source code for `musl` library patched for PolkaVM/CoreVM.
+It is built for RISCV,
+uses `picoalloc` as memory allocator, and
+forwards all system calls via `pvm_syscall` host-call.
+
+Besides that we provide `polkavm-cc` and `polkavm-c++` wrappers
+to build applications that use the `musl` port.
+
+
+## How to build the SDK
+
+```bash
+
+# Build the toolchain for `polkavm` or `corevm`.
+# Tested on clang-19
+env CC=clang CXX=clang++ ./setup.sh corevm
+
+# Activate (setup environment variables) for the toolchain.
+# Either `polkavm` or `corevm`.
+. ./activate.sh corevm
+```
+
+
+## How to build an application using the SDK
+
+```bash
+cd apps/quake
+make -j
+```
