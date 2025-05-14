@@ -1,21 +1,40 @@
-use alloc::{collections::BTreeMap, sync::Arc};
+use alloc::{collections::BTreeMap, vec};
 use core::ffi::CStr;
 
-use crate::{libc::*, Environment, FileBlob, FileSystem, Machine, MachineError, Reg};
+use crate::{
+	libc::*, Environment, Error, FileSystem, IntoSyscallRet, Machine, MachineError, Reg, SeekFrom,
+};
 
 use SyscallOutcome::*;
+
+pub struct KernelState<Fd> {
+	pub fds: BTreeMap<u64, Fd>,
+	/// The next file descriptor after reserved ones.
+	pub next_fd: u64,
+}
+
+impl<Fd> KernelState<Fd> {
+	pub fn new() -> Self {
+		Self { fds: BTreeMap::new(), next_fd: 0 }
+	}
+}
+
+impl<Fd> Default for KernelState<Fd> {
+	fn default() -> Self {
+		Self::new()
+	}
+}
 
 pub struct Kernel<M: Machine, E: Environment, F: FileSystem> {
 	machine: M,
 	env: E,
 	fs: F,
-	fds: BTreeMap<u64, Fd>,
-	next_fd: u64,
+	state: KernelState<F::Fd>,
 }
 
 impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
-	pub fn new(machine: M, env: E, fs: F) -> Self {
-		Self { machine, env, fs, fds: BTreeMap::new(), next_fd: 3 }
+	pub fn new(state: KernelState<F::Fd>, machine: M, env: E, fs: F) -> Self {
+		Self { machine, env, fs, state }
 	}
 
 	pub fn machine(&self) -> &M {
@@ -46,6 +65,10 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 		(self.machine, self.env)
 	}
 
+	pub fn into_state(self) -> KernelState<F::Fd> {
+		self.state
+	}
+
 	pub fn handle_syscall(&mut self) -> Result<SyscallOutcome, MachineError> {
 		let syscall = self.machine.reg(Reg::A0);
 		let a1 = self.machine.reg(Reg::A1);
@@ -53,42 +76,54 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 		let a3 = self.machine.reg(Reg::A3);
 		let a4 = self.machine.reg(Reg::A4);
 		let a5 = self.machine.reg(Reg::A5);
-		log::trace!(
-			"Syscall: {syscall:>3}, \
-            args = [0x{a1:>016x}, 0x{a2:>016x}, 0x{a3:>016x}, 0x{a4:>016x}, 0x{a5:>016x}]"
-		);
 		match syscall {
 			SYS_READ => {
-				let result = self.handle_read(a1, a2, a3);
+				let result = self.handle_read(a1, a2, a3).into_ret();
+				log::trace!("Syscall read(fd={a1}, address={a2:#x}, length={a3}) = {result}");
 				self.machine.set_reg(Reg::A0, result);
 			},
 			SYS_READV => {
-				let result = self.handle_readv(a1, a2, a3);
+				let result = self.handle_readv(a1, a2, a3).into_ret();
+				log::trace!("Syscall readv(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result}");
 				self.machine.set_reg(Reg::A0, result);
 			},
 			SYS_WRITE => {
-				let result = self.handle_write(a1, a2, a3);
+				let result = self.handle_write(a1, a2, a3).into_ret();
+				log::trace!("Syscall write(fd={a1}, address={a2:#x}, length={a3}) = {result}");
 				self.machine.set_reg(Reg::A0, result);
 			},
 			SYS_WRITEV => {
-				let result = self.handle_writev(a1, a2, a3);
+				let result = self.handle_writev(a1, a2, a3).into_ret();
+				log::trace!("Syscall writev(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result}");
 				self.machine.set_reg(Reg::A0, result);
 			},
 			SYS_EXIT => {
-				log::info!("Exit called: status={}", a1);
+				log::info!("Syscall exit(status={a1})");
 				return Ok(Exit(a1 as u8));
 			},
 			SYS_OPENAT => {
-				let result = self.handle_openat(a1, a2, a3);
+				let result = self.handle_openat(a1, a2, a3).into_ret();
+				log::trace!("Syscall openat(dirfd={a1}, path={a2:#x}, flags={a3:#o}) = {result}");
 				self.machine.set_reg(Reg::A0, result);
 			},
 			SYS_LSEEK => {
-				let result = self.handle_lseek(a1, a2 as i64, a3);
+				let result = self.handle_lseek(a1, a2 as i64, a3).into_ret();
+				log::trace!("Syscall lseek(fd={a1}, offset={a2}, whence={a3}) = {result}");
 				self.machine.set_reg(Reg::A0, result);
 			},
 			SYS_CLOSE => {
-				let result = self.handle_close(a1);
+				let result = self.handle_close(a1).into_ret();
+				log::trace!("Syscall close(fd={a1}) = {result}");
 				self.machine.set_reg(Reg::A0, result);
+			},
+			SYS_SET_TID_ADDRESS => {
+				let result = self.handle_set_tid_address(a1).into_ret();
+				log::trace!("Syscall set_tid_address(tid_ptr={a1:#x}) = {result}");
+				self.machine.set_reg(Reg::A0, result);
+			},
+			SYS_IOCTL => {
+				log::debug!("Unimplemented syscall ioctl(fd={a1}, op={a2:#x}, {a3}, {a4}, {a5})");
+				self.machine.set_reg(Reg::A0, errno(ENOSYS));
 			},
 			_ => {
 				log::debug!(
@@ -101,195 +136,112 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 		Ok(Continue)
 	}
 
-	fn handle_open(&mut self, path: &CStr, flags: u64) -> u64 {
-		log::debug!("Open: path={:?}, flags={:#o}", path, flags);
-
-		if let Some(file) = self.fs.read_file(path) {
-			if (flags & (O_WRONLY | O_RDWR)) != 0 {
-				log::trace!("  -> EACCES");
-				return errno(EACCES);
-			}
-
-			let fd = self.next_fd;
-			log::trace!("  -> fd={fd}");
-
-			self.next_fd += 1;
-			self.fds.insert(fd, Fd { file, position: 0 });
-
-			return fd;
+	fn handle_open(&mut self, path: &CStr, flags: u64) -> Result<u64, Error> {
+		let file = self.fs.open_file(path)?;
+		if (flags & (O_WRONLY | O_RDWR)) != 0 {
+			return Err(Error(EACCES));
 		}
-
-		log::trace!("  -> ENOENT");
-		errno(ENOENT)
+		let fd = RESERVED_FD_COUNT + self.state.next_fd;
+		self.state.next_fd += 1;
+		self.state.fds.insert(fd, file);
+		Ok(fd)
 	}
 
-	fn handle_openat(&mut self, dirfd: u64, path: u64, flags: u64) -> u64 {
+	fn handle_openat(&mut self, dirfd: u64, path: u64, flags: u64) -> Result<u64, Error> {
 		if dirfd == AT_FDCWD {
-			let path = match self.machine.read_cstring(path, PATH_MAX) {
-				Ok(path) => path,
-				Err(MachineError::BadAddress) => return errno(EFAULT),
-			};
+			let path = self.machine.read_cstring(path, PATH_MAX)?;
 			self.handle_open(&path, flags)
 		} else {
-			errno(ENOSYS)
+			Err(Error(ENOSYS))
 		}
 	}
 
-	fn handle_close(&mut self, fd: u64) -> u64 {
-		log::debug!("Close: fd = {fd}");
-		let Some(_fd) = self.fds.remove(&fd) else {
-			log::trace!("  -> EBADF");
-			return errno(EBADF);
-		};
-
-		0
+	fn handle_close(&mut self, fd: u64) -> Result<u64, Error> {
+		self.state.fds.remove(&fd).ok_or(Error(EBADF))?;
+		Ok(0)
 	}
 
-	fn handle_read(&mut self, fd: u64, address: u64, length: u64) -> u64 {
-		log::trace!("Read: fd={fd}, address=0x{address:x}, length={length}");
-
-		let Some(fd) = self.fds.get_mut(&fd) else {
-			log::trace!("  -> EBADF");
-			return errno(EBADF);
-		};
-
+	fn handle_read(&mut self, fd: u64, address: u64, length: u64) -> Result<u64, Error> {
+		let fd = self.state.fds.get_mut(&fd).ok_or(Error(EBADF))?;
 		if address.checked_add(length).is_none() || u32::try_from(address + length).is_err() {
-			log::trace!("  -> EFAULT");
-			return errno(EFAULT);
+			return Err(Error(EFAULT));
 		}
-
-		let end = core::cmp::min(fd.position.wrapping_add(length), fd.file.len() as u64);
-		if fd.position >= end || fd.position >= fd.file.len() as u64 {
-			log::trace!("  -> offset={}, length=0", fd.position);
-			return 0;
-		}
-
-		let blob = &fd.file[fd.position as usize..end as usize];
-		match self.machine.write_memory(address, blob) {
-			Ok(()) => {},
-			Err(MachineError::BadAddress) => {
-				log::trace!("  -> EFAULT");
-				return errno(EFAULT);
-			},
-		}
-
-		let length_out = blob.len() as u64;
-		log::trace!(
-			"  -> offset={}, length={}, new offset={}",
-			fd.position,
-			length_out,
-			fd.position + length_out
-		);
-
-		fd.position += length_out;
-		length_out
+		let buf_len = length.try_into().map_err(|_| Error(EFAULT))?;
+		let mut buf = vec![0_u8; buf_len];
+		let num_bytes_read = self.fs.read(fd, &mut buf)?;
+		buf.resize(num_bytes_read as usize, 0_u8);
+		self.machine.write_memory(address, &buf[..])?;
+		Ok(num_bytes_read)
 	}
 
-	fn handle_readv(&mut self, fd: u64, iov: u64, iovcnt: u64) -> u64 {
+	fn handle_readv(&mut self, fd: u64, iov: u64, iovcnt: u64) -> Result<u64, Error> {
 		if iovcnt == 0 || iovcnt > IOV_MAX {
-			return errno(EINVAL);
+			return Err(Error(EINVAL));
 		}
 
 		let mut total_length = 0;
 		for n in 0..iovcnt {
-			let address = match self.machine.read_u64(iov.wrapping_add(n * 16)) {
-				Ok(address) => address,
-				Err(MachineError::BadAddress) => return errno(EFAULT),
-			};
-			let length = match self.machine.read_u64(iov.wrapping_add(n * 16).wrapping_add(8)) {
-				Ok(length) => length,
-				Err(MachineError::BadAddress) => return errno(EFAULT),
-			};
-			let errcode = self.handle_read(fd, address, length);
-			if (errcode as i64) < 0 {
-				return errcode;
-			}
-
+			let address = self.machine.read_u64(iov.wrapping_add(n * 16))?;
+			let length = self.machine.read_u64(iov.wrapping_add(n * 16).wrapping_add(8))?;
+			self.handle_read(fd, address, length)?;
 			total_length += length;
 		}
 
-		total_length
+		Ok(total_length)
 	}
 
-	fn handle_write(&mut self, fd: u64, address: u64, length: u64) -> u64 {
-		if fd != FILENO_STDOUT && fd != FILENO_STDERR {
-			return errno(EBADF);
+	fn handle_write(&mut self, fd: u64, address: u64, length: u64) -> Result<u64, Error> {
+		if fd != FILENO_STDOUT && fd != FILENO_STDERR && !self.state.fds.contains_key(&fd) {
+			return Err(Error(EBADF));
 		}
 
 		if address.checked_add(length).is_none() || u32::try_from(address + length).is_err() {
-			return errno(EFAULT);
+			return Err(Error(EFAULT));
 		}
 
-		let data = match self.machine.read_memory(address, length) {
-			Ok(data) => data,
-			Err(MachineError::BadAddress) => return errno(EFAULT),
-		};
+		let data = self.machine.read_memory(address, length)?;
 
-		if fd == FILENO_STDOUT {
-			self.env.write_to_stdout(&data[..])
-		} else {
-			self.env.write_to_stderr(&data[..])
+		match fd {
+			FILENO_STDOUT => self.env.write_to_stdout(&data[..]),
+			FILENO_STDERR => self.env.write_to_stderr(&data[..]),
+			_ => Err(Error(ENOSYS)),
 		}
 	}
 
-	fn handle_writev(&mut self, fd: u64, iov: u64, iovcnt: u64) -> u64 {
+	fn handle_writev(&mut self, fd: u64, iov: u64, iovcnt: u64) -> Result<u64, Error> {
 		if iovcnt == 0 || iovcnt > IOV_MAX {
-			return errno(EINVAL);
+			return Err(Error(EINVAL));
 		}
 
 		let mut total_length = 0;
 		for n in 0..iovcnt {
-			let address = match self.machine.read_u64(iov.wrapping_add(n * 16)) {
-				Ok(address) => address,
-				Err(MachineError::BadAddress) => return errno(EFAULT),
-			};
-			let length = match self.machine.read_u64(iov.wrapping_add(n * 16).wrapping_add(8)) {
-				Ok(length) => length,
-				Err(MachineError::BadAddress) => return errno(EFAULT),
-			};
-			let errcode = self.handle_write(fd, address, length);
-			if (errcode as i64) < 0 {
-				return errcode;
-			}
-
+			let address = self.machine.read_u64(iov.wrapping_add(n * 16))?;
+			let length = self.machine.read_u64(iov.wrapping_add(n * 16).wrapping_add(8))?;
+			self.handle_write(fd, address, length)?;
 			total_length += length;
 		}
 
-		total_length
+		Ok(total_length)
 	}
 
-	fn handle_lseek(&mut self, fd: u64, offset: i64, whence: u64) -> u64 {
-		log::trace!("Seek: fd={fd}, offset={offset}, whence={whence}");
-
-		let Some(fd) = self.fds.get_mut(&fd) else {
-			log::trace!("  -> BADF");
-			return errno(EBADF);
-		};
-
-		match whence {
-			SEEK_SET => {
-				fd.position = offset as u64;
-			},
-			SEEK_CUR => {
-				fd.position = core::cmp::min(
-					(fd.position as i64).wrapping_add(offset) as u64,
-					fd.file.len() as u64,
-				);
-			},
-			SEEK_END => {
-				fd.position = core::cmp::min(
-					(fd.file.len() as i64).wrapping_add(offset) as u64,
-					fd.file.len() as u64,
-				);
-			},
+	fn handle_lseek(&mut self, fd: u64, offset: i64, whence: u64) -> Result<u64, Error> {
+		let fd = self.state.fds.get_mut(&fd).ok_or(Error(EBADF))?;
+		let from = match whence {
+			SEEK_SET => SeekFrom::Start(offset as u64),
+			SEEK_CUR => SeekFrom::Current(offset),
+			SEEK_END => SeekFrom::End(offset),
 			_ => {
-				log::trace!("  -> EINVAL");
-				return errno(EINVAL);
+				return Err(Error(EINVAL));
 			},
-		}
+		};
+		self.fs.seek(fd, from)
+	}
 
-		log::trace!("  -> offset={}", fd.position);
-		fd.position
+	fn handle_set_tid_address(&mut self, thread_id_address: u64) -> Result<u64, Error> {
+		if thread_id_address != 0 {
+			self.machine.write_u32(thread_id_address, THREAD_ID)?;
+		}
+		Ok(THREAD_ID.into())
 	}
 }
 
@@ -299,7 +251,7 @@ pub enum SyscallOutcome {
 	Exit(u8),
 }
 
-struct Fd {
-	file: Arc<FileBlob>,
-	position: u64,
-}
+const THREAD_ID: u32 = 1;
+
+/// 0, 1, 2 are reserved.
+const RESERVED_FD_COUNT: u64 = 3;
