@@ -19,7 +19,7 @@ picoalloc_build() {
 	rm -rf target
 	RUSTC_BOOTSTRAP=1 cargo build \
 		-Zbuild-std=core,alloc \
-        --quiet
+        --quiet \
 		--package picoalloc_native \
 		--release \
 		--target="$root"/sdk/riscv64emac-unknown-none-polkavm.json \
