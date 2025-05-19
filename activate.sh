@@ -2,11 +2,10 @@
 
 suffix="$1"
 case "$suffix" in
-polkavm) picoalloc_build polkavm ;;
-corevm) picoalloc_build corevm --features corevm ;;
+polkavm | corevm) ;;
 *)
-	printf "usage: . ./activate.sh corevm|polkavm" >&2
-	exit 1
+	printf "usage: . ./activate.sh corevm|polkavm\n" >&2
+	return 1
 	;;
 esac
 

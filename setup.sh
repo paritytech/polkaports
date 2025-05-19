@@ -44,7 +44,7 @@ musl_install() {
 	# Install CoreVM-specific headers.
 	case "$suffix" in
 	polkavm) ;;
-	corevm) cp "$root"/sdk/corevm_guest.h "$sysroot"/include ;;
+	corevm) ln -f "$root"/sdk/corevm_guest.h "$sysroot"/include/ ;;
 	esac
 
 	mkdir -p "$sysroot"/lib
