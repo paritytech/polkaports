@@ -20,26 +20,6 @@ POLKAVM_IMPORT(void, corevm_video_mode_impl, uint64_t, uint64_t, uint64_t, uint6
 POLKAVM_IMPORT(void, corevm_audio_mode_impl, uint64_t, uint64_t, uint64_t);
 POLKAVM_IMPORT(uint64_t, corevm_yield_audio_frame_impl, uint64_t, uint64_t);
 
-#ifndef COREVM_PRINTF_BUFFER_LEN
-#define COREVM_PRINTF_BUFFER_LEN 4096
-#endif
-
-#define corevm_printf_impl(stream, format, ...) \
-    { \
-        char buffer[COREVM_PRINTF_BUFFER_LEN]; \
-        int n = snprintf(buffer, COREVM_PRINTF_BUFFER_LEN, format, ##__VA_ARGS__); \
-        if (n > 0) { \
-            if (n == COREVM_PRINTF_BUFFER_LEN) { \
-                n = COREVM_PRINTF_BUFFER_LEN - 1; \
-            } \
-            buffer[n] = 0; \
-            corevm_yield_console_data(stream, (uint64_t)buffer, (uint64_t)(n + 1)); \
-        } \
-    }
-
-#define corevm_printf(format, ...) corevm_printf_impl(1, format, ##__VA_ARGS__)
-#define corevm_eprintf(format, ...) corevm_printf_impl(2, format, ##__VA_ARGS__)
-
 inline static void corevm_yield_video_frame(const void* frame, size_t frame_len) {
     corevm_yield_video_frame_impl((uint64_t) frame, (uint64_t) frame_len);
 }
