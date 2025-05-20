@@ -1,5 +1,5 @@
 use alloc::{collections::BTreeMap, vec};
-use core::ffi::CStr;
+use core::{ffi::CStr, mem::size_of};
 
 use crate::{
 	libc::*, Environment, Error, FileSystem, IntoSyscallRet, Machine, MachineError, Reg, SeekFrom,
@@ -122,8 +122,9 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 				self.machine.set_reg(Reg::A0, result);
 			},
 			SYS_IOCTL => {
-				log::debug!("Unimplemented syscall ioctl(fd={a1}, op={a2:#x}, {a3}, {a4}, {a5})");
-				self.machine.set_reg(Reg::A0, errno(ENOSYS));
+				let result = self.handle_ioctl(a1, a2, a3);
+				log::debug!("Syscall ioctl(fd={a1}, op={a2:#x}, {a3}, {a4}, {a5}) = {result:?}");
+				self.machine.set_reg(Reg::A0, result.into_ret());
 			},
 			_ => {
 				log::debug!(
@@ -242,6 +243,23 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 			self.machine.write_u32(thread_id_address, THREAD_ID)?;
 		}
 		Ok(THREAD_ID.into())
+	}
+
+	fn handle_ioctl(&mut self, _fd: u64, op: u64, arg0: u64) -> Result<u64, Error> {
+		if op == TIOCGWINSZ {
+			// NOTE This is a stub to make Musl's `__stdout_write` use line buffering.
+			let address = arg0;
+			let vt100_size = WinSize { col: 80, row: 25, xpixel: 0, ypixel: 0 };
+			let bytes = unsafe {
+				core::slice::from_raw_parts(
+					core::ptr::from_ref(&vt100_size).cast::<u8>(),
+					size_of::<WinSize>(),
+				)
+			};
+			self.machine.write_memory(address, bytes)?;
+			return Ok(0);
+		}
+		Err(Error(ENOSYS))
 	}
 }
 

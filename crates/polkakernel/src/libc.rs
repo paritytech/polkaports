@@ -39,6 +39,16 @@ pub const SYS_WRITEV: u64 = 66;
 pub const SYS_SET_TID_ADDRESS: u64 = 96;
 pub const SYS_IOCTL: u64 = 29;
 
+pub const TIOCGWINSZ: u64 = 0x5413;
+
+#[repr(C)]
+pub struct WinSize {
+	pub row: u16,
+	pub col: u16,
+	pub xpixel: u16,
+	pub ypixel: u16,
+}
+
 pub const fn errno(error: u64) -> u64 {
 	(-(error as i64)) as u64
 }
