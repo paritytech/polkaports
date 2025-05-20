@@ -15,10 +15,10 @@ POLKAVM_IMPORT(uint64_t, corevm_gas);
 POLKAVM_IMPORT(uint64_t, corevm_alloc, uint64_t);
 POLKAVM_IMPORT(void, corevm_free, uint64_t, uint64_t);
 POLKAVM_IMPORT(uint64_t, corevm_yield_console_data, uint64_t, uint64_t, uint64_t);
-POLKAVM_IMPORT(uint64_t, corevm_yield_video_frame_impl, uint64_t, uint64_t, uint64_t);
+POLKAVM_IMPORT(uint64_t, corevm_yield_video_frame_impl, uint64_t, uint64_t);
 POLKAVM_IMPORT(void, corevm_video_mode_impl, uint64_t, uint64_t, uint64_t, uint64_t);
-POLKAVM_IMPORT(void, corevm_audio_mode_impl, uint64_t, uint64_t, uint64_t, uint64_t);
-POLKAVM_IMPORT(uint64_t, corevm_yield_audio_frame_impl, uint64_t, uint64_t, uint64_t);
+POLKAVM_IMPORT(void, corevm_audio_mode_impl, uint64_t, uint64_t, uint64_t);
+POLKAVM_IMPORT(uint64_t, corevm_yield_audio_frame_impl, uint64_t, uint64_t);
 
 #ifndef COREVM_PRINTF_BUFFER_LEN
 #define COREVM_PRINTF_BUFFER_LEN 4096
@@ -33,25 +33,15 @@ POLKAVM_IMPORT(uint64_t, corevm_yield_audio_frame_impl, uint64_t, uint64_t, uint
                 n = COREVM_PRINTF_BUFFER_LEN - 1; \
             } \
             buffer[n] = 0; \
-            while (true) { \
-                uint64_t ret = corevm_yield_console_data(stream, (uint64_t)buffer, (uint64_t)(n + 1)); \
-                if (ret == 0) { \
-                    break; \
-                } \
-            } \
+            corevm_yield_console_data(stream, (uint64_t)buffer, (uint64_t)(n + 1)); \
         } \
     }
 
 #define corevm_printf(format, ...) corevm_printf_impl(1, format, ##__VA_ARGS__)
 #define corevm_eprintf(format, ...) corevm_printf_impl(2, format, ##__VA_ARGS__)
 
-inline static void corevm_yield_video_frame(size_t frame_number, const void* frame, size_t frame_len) {
-    while (1) {
-        uint64_t ret = corevm_yield_video_frame_impl((uint64_t) frame_number, (uint64_t) frame, (uint64_t) frame_len);
-        if (ret == 0) {
-            break;
-        }
-    }
+inline static void corevm_yield_video_frame(const void* frame, size_t frame_len) {
+    corevm_yield_video_frame_impl((uint64_t) frame, (uint64_t) frame_len);
 }
 
 enum CoreVmVideoFrameFormat {
@@ -74,33 +64,26 @@ inline static void corevm_video_mode(const struct CoreVmVideoMode* mode) {
     );
 }
 
-enum CoreVmAudioFrameFormat {
+enum CoreVmAudioSampleFormat {
     COREVM_AUDIO_S16LE = 1
 };
 
 struct CoreVmAudioMode {
-    uint32_t channels;
-    uint32_t bits_per_sample;
-    uint16_t sample_rate;
-    enum CoreVmAudioFrameFormat format;
+    uint32_t sample_rate;
+    uint8_t channels;
+    enum CoreVmAudioSampleFormat sample_format;
 };
 
 inline static void corevm_audio_mode(const struct CoreVmAudioMode* mode) {
     corevm_audio_mode_impl(
         (uint64_t) mode->channels,
-        (uint64_t) mode->bits_per_sample,
         (uint64_t) mode->sample_rate,
-        (uint64_t) mode->format
+        (uint64_t) mode->sample_format
     );
 }
 
-inline static void corevm_yield_audio_frame(size_t frame_number, const void* frame, size_t frame_len) {
-    while (1) {
-        uint64_t ret = corevm_yield_audio_frame_impl((uint64_t) frame_number, (uint64_t) frame, (uint64_t) frame_len);
-        if (ret == 0) {
-            break;
-        }
-    }
+inline static void corevm_yield_audio_frame(const void* frame, size_t frame_len) {
+    corevm_yield_audio_frame_impl((uint64_t) frame, (uint64_t) frame_len);
 }
 
 #endif

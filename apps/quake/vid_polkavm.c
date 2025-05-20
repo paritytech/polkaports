@@ -40,6 +40,8 @@ extern viddef_t vid; // global video state
 #define	BASEWIDTH	320
 #define	BASEHEIGHT	200
 
+#define FRAMES_PER_SEC_F 60.0
+
 byte	vid_buffer[BASEWIDTH*BASEHEIGHT];
 short	zbuffer[BASEWIDTH*BASEHEIGHT];
 byte	surfcache[256*1024];
@@ -93,7 +95,7 @@ static const float MOUSE_SENSITIVITY_Y = 0.15;
 void	VID_Update (vrect_t *rects)
 {
     pvm_display(vid.width, vid.height, (long)vid.buffer);
-    s_timestamp += (1.0 / 60.0);
+    s_timestamp += (1.0 / FRAMES_PER_SEC_F);
 
     while (1) {
         struct Event events[32];
@@ -227,7 +229,7 @@ void S_RenderSoundFrame(void)
         return;
     }
 
-    s_samples_pending += (1.0 / 60.0) * shm->speed;
+    s_samples_pending += (1.0 / FRAMES_PER_SEC_F) * shm->speed;
 
     short buffer[SAMPLES * CHANNELS];
     for (;;) {

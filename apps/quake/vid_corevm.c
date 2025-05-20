@@ -29,10 +29,14 @@ extern viddef_t vid; // global video state
 
 #define SAMPLES 256
 #define CHANNELS 2
+// This value somehow can't be arbitrary.
 #define SAMPLE_RATE 11025
 
 #define	BASEWIDTH	320
 #define	BASEHEIGHT	200
+
+#define FRAMES_PER_SEC 60
+#define FRAMES_PER_SEC_F 60.0
 
 #define PALETTE_LEN (256 * 3)
 #define FRAME_LEN (BASEWIDTH * BASEHEIGHT)
@@ -73,7 +77,7 @@ void	VID_Init (unsigned char *palette)
     struct CoreVmVideoMode mode = {
         .width = vid.width,
         .height = vid.height,
-        .refresh_rate = 60,
+        .refresh_rate = FRAMES_PER_SEC,
         .format = COREVM_VIDEO_RGB88_INDEXED8,
     };
     corevm_video_mode(&mode);
@@ -94,14 +98,11 @@ static float s_mouse_x = 0.0;
 static float s_mouse_y = 0.0;
 static const float MOUSE_SENSITIVITY_X = 0.17;
 static const float MOUSE_SENSITIVITY_Y = 0.15;
-static size_t video_frame_number = 0;
-static size_t audio_frame_number = 0;
 
 void	VID_Update (vrect_t *rects)
 {
-    corevm_yield_video_frame(video_frame_number, vid_buffer, 1 + PALETTE_LEN + FRAME_LEN);
-    ++video_frame_number;
-    s_timestamp += (1.0 / 60.0);
+    corevm_yield_video_frame(vid_buffer, 1 + PALETTE_LEN + FRAME_LEN);
+    s_timestamp += (1.0 / FRAMES_PER_SEC_F);
 
     if (cls.demoplayback) {
         return;
@@ -146,9 +147,8 @@ qboolean SNDDMA_Init(void) {
     shm->samples = SAMPLES / (shm->samplebits / 8);
     struct CoreVmAudioMode mode = {
         .channels = shm->channels,
-        .bits_per_sample = shm->samplebits,
-        .sample_rate = shm->speed,
-        .format = COREVM_AUDIO_S16LE,
+        .sample_rate = SAMPLE_RATE,
+        .sample_format = COREVM_AUDIO_S16LE,
     };
     corevm_audio_mode(&mode);
     return 1;
@@ -165,7 +165,7 @@ void S_RenderSoundFrame(void)
         return;
     }
 
-    s_samples_pending += (1.0 / 60.0) * shm->speed;
+    s_samples_pending += (1.0 / FRAMES_PER_SEC_F) * shm->speed;
 
     short buffer[SAMPLES * CHANNELS];
     for (;;) {
@@ -267,8 +267,7 @@ void S_RenderSoundFrame(void)
             }
         }
 
-        corevm_yield_audio_frame(audio_frame_number, buffer, count);
-        ++audio_frame_number;
+        corevm_yield_audio_frame(buffer, count*sizeof(int16_t)*CHANNELS);
         paintedtime += count;
     }
 }
