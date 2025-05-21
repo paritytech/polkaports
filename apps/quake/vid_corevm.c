@@ -267,7 +267,7 @@ void S_RenderSoundFrame(void)
             }
         }
 
-        corevm_yield_audio_frame(buffer, count*sizeof(int16_t)*CHANNELS);
+        corevm_yield_audio_samples(buffer, count*sizeof(int16_t)*CHANNELS);
         paintedtime += count;
     }
 }

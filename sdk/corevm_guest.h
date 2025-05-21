@@ -18,7 +18,7 @@ POLKAVM_IMPORT(uint64_t, corevm_yield_console_data, uint64_t, uint64_t, uint64_t
 POLKAVM_IMPORT(uint64_t, corevm_yield_video_frame_impl, uint64_t, uint64_t);
 POLKAVM_IMPORT(void, corevm_video_mode_impl, uint64_t, uint64_t, uint64_t, uint64_t);
 POLKAVM_IMPORT(void, corevm_audio_mode_impl, uint64_t, uint64_t, uint64_t);
-POLKAVM_IMPORT(uint64_t, corevm_yield_audio_frame_impl, uint64_t, uint64_t);
+POLKAVM_IMPORT(uint64_t, corevm_yield_audio_samples_impl, uint64_t, uint64_t);
 
 inline static void corevm_yield_video_frame(const void* frame, size_t frame_len) {
     corevm_yield_video_frame_impl((uint64_t) frame, (uint64_t) frame_len);
@@ -62,8 +62,8 @@ inline static void corevm_audio_mode(const struct CoreVmAudioMode* mode) {
     );
 }
 
-inline static void corevm_yield_audio_frame(const void* frame, size_t frame_len) {
-    corevm_yield_audio_frame_impl((uint64_t) frame, (uint64_t) frame_len);
+inline static void corevm_yield_audio_samples(const void* frame, size_t frame_len) {
+    corevm_yield_audio_samples_impl((uint64_t) frame, (uint64_t) frame_len);
 }
 
 #endif
