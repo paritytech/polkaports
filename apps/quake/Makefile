@@ -1,7 +1,8 @@
 CC = polkavm-cc
-CFLAGS = -Os -std=gnu99 -Wno-dangling-else -Wno-trigraphs -Wno-unused-value -Wno-pointer-to-int-cast -Wno-pointer-sign -flto -ferror-limit=0 -ggdb
+CFLAGS = -Os -Werror=date-time -Wno-dangling-else -Wno-trigraphs -Wno-unused-value -Wno-pointer-to-int-cast -Wno-pointer-sign -flto -ferror-limit=0 -ggdb
 LDFLAGS =
 OUTPUT = output
+MIN_STACK_SIZE = 524288
 
 QUAKE_OBJS = \
 	$(OUTPUT)/cd_null.o \
@@ -57,7 +58,6 @@ QUAKE_OBJS = \
 	$(OUTPUT)/snd_mem.o \
 	$(OUTPUT)/snd_dma.o \
 	$(OUTPUT)/sys_null.o \
-	$(OUTPUT)/vid_polkavm.o \
 	$(OUTPUT)/wad.o \
 	$(OUTPUT)/zone.o \
 	$(OUTPUT)/sv_main.o \
@@ -67,13 +67,18 @@ QUAKE_OBJS = \
 	$(OUTPUT)/sv_world.o \
 	$(OUTPUT)/pr_cmds.o \
 	$(OUTPUT)/pr_edict.o \
-	$(OUTPUT)/pr_exec.o
+	$(OUTPUT)/pr_exec.o \
+	$(OUTPUT)/vid_$(POLKAPORTS_SUFFIX).o
 
-$(OUTPUT)/quake.polkavm : $(OUTPUT)/quake.elf
-	polkatool link $(OUTPUT)/quake.elf --output $(OUTPUT)/quake.polkavm --min-stack-size 524288
+.PHONY: all clean
 
-$(OUTPUT)/quake.elf : $(QUAKE_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(QUAKE_OBJS)
+all: $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX)
+
+$(OUTPUT)/quake.$(POLKAPORTS_SUFFIX): $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf
+	polkatool link $< --output $@ --min-stack-size $(MIN_STACK_SIZE)
+
+$(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf: $(QUAKE_OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $+
 
 $(OUTPUT)/%.o: %.c
 	@mkdir -p output
