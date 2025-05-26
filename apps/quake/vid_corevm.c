@@ -35,8 +35,8 @@ extern viddef_t vid; // global video state
 #define	BASEWIDTH	320
 #define	BASEHEIGHT	200
 
-#define FRAMES_PER_SEC 60
-#define FRAMES_PER_SEC_F 60.0
+#define FRAMES_PER_SEC 24
+#define FRAMES_PER_SEC_F 24.0
 
 #define PALETTE_LEN (256 * 3)
 #define FRAME_LEN (BASEWIDTH * BASEHEIGHT)
