@@ -2,7 +2,7 @@ CC = polkavm-cc
 CFLAGS = -Os -Werror=date-time -Wno-dangling-else -Wno-trigraphs -Wno-unused-value -Wno-pointer-to-int-cast -Wno-pointer-sign -flto -ferror-limit=0 -ggdb
 LDFLAGS =
 OUTPUT = output
-MIN_STACK_SIZE = 524288
+MIN_STACK_SIZE = 1048576
 
 QUAKE_OBJS = \
 	$(OUTPUT)/cd_null.o \
