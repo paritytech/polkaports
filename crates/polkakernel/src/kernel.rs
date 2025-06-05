@@ -25,77 +25,42 @@ impl<Fd> Default for KernelState<Fd> {
 	}
 }
 
-pub struct Kernel<M: Machine, E: Environment, F: FileSystem> {
-	machine: M,
-	env: E,
-	fs: F,
-	state: KernelState<F::Fd>,
+/// Linux kernel engine that implements system calls.
+pub struct Kernel<C: Machine + Environment + FileSystem> {
+	/// The execution context of all syscalls.
+	pub context: C,
+	/// Persistent state.
+	pub state: KernelState<C::Fd>,
 }
 
-impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
-	pub fn new(state: KernelState<F::Fd>, machine: M, env: E, fs: F) -> Self {
-		Self { machine, env, fs, state }
-	}
-
-	pub fn machine(&self) -> &M {
-		&self.machine
-	}
-
-	pub fn machine_mut(&mut self) -> &mut M {
-		&mut self.machine
-	}
-
-	pub fn env(&self) -> &E {
-		&self.env
-	}
-
-	pub fn env_mut(&mut self) -> &mut E {
-		&mut self.env
-	}
-
-	pub fn fs(&self) -> &F {
-		&self.fs
-	}
-
-	pub fn fs_mut(&mut self) -> &mut F {
-		&mut self.fs
-	}
-
-	pub fn into_inner(self) -> (M, E) {
-		(self.machine, self.env)
-	}
-
-	pub fn into_state(self) -> KernelState<F::Fd> {
-		self.state
-	}
-
+impl<C: Machine + Environment + FileSystem> Kernel<C> {
 	pub fn handle_syscall(&mut self) -> Result<SyscallOutcome, MachineError> {
-		let syscall = self.machine.reg(Reg::A0);
-		let a1 = self.machine.reg(Reg::A1);
-		let a2 = self.machine.reg(Reg::A2);
-		let a3 = self.machine.reg(Reg::A3);
-		let a4 = self.machine.reg(Reg::A4);
-		let a5 = self.machine.reg(Reg::A5);
+		let syscall = self.context.reg(Reg::A0);
+		let a1 = self.context.reg(Reg::A1);
+		let a2 = self.context.reg(Reg::A2);
+		let a3 = self.context.reg(Reg::A3);
+		let a4 = self.context.reg(Reg::A4);
+		let a5 = self.context.reg(Reg::A5);
 		match syscall {
 			SYS_READ => {
 				let result = self.handle_read(a1, a2, a3).into_ret();
 				log::trace!("Syscall read(fd={a1}, address={a2:#x}, length={a3}) = {result}");
-				self.machine.set_reg(Reg::A0, result);
+				self.context.set_reg(Reg::A0, result);
 			},
 			SYS_READV => {
 				let result = self.handle_readv(a1, a2, a3).into_ret();
 				log::trace!("Syscall readv(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result}");
-				self.machine.set_reg(Reg::A0, result);
+				self.context.set_reg(Reg::A0, result);
 			},
 			SYS_WRITE => {
 				let result = self.handle_write(a1, a2, a3).into_ret();
 				log::trace!("Syscall write(fd={a1}, address={a2:#x}, length={a3}) = {result}");
-				self.machine.set_reg(Reg::A0, result);
+				self.context.set_reg(Reg::A0, result);
 			},
 			SYS_WRITEV => {
 				let result = self.handle_writev(a1, a2, a3).into_ret();
 				log::trace!("Syscall writev(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result}");
-				self.machine.set_reg(Reg::A0, result);
+				self.context.set_reg(Reg::A0, result);
 			},
 			SYS_EXIT => {
 				log::info!("Syscall exit(status={a1})");
@@ -104,41 +69,41 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 			SYS_OPENAT => {
 				let result = self.handle_openat(a1, a2, a3).into_ret();
 				log::trace!("Syscall openat(dirfd={a1}, path={a2:#x}, flags={a3:#o}) = {result}");
-				self.machine.set_reg(Reg::A0, result);
+				self.context.set_reg(Reg::A0, result);
 			},
 			SYS_LSEEK => {
 				let result = self.handle_lseek(a1, a2 as i64, a3).into_ret();
 				log::trace!("Syscall lseek(fd={a1}, offset={a2}, whence={a3}) = {result}");
-				self.machine.set_reg(Reg::A0, result);
+				self.context.set_reg(Reg::A0, result);
 			},
 			SYS_CLOSE => {
 				let result = self.handle_close(a1).into_ret();
 				log::trace!("Syscall close(fd={a1}) = {result}");
-				self.machine.set_reg(Reg::A0, result);
+				self.context.set_reg(Reg::A0, result);
 			},
 			SYS_SET_TID_ADDRESS => {
 				let result = self.handle_set_tid_address(a1).into_ret();
 				log::trace!("Syscall set_tid_address(tid_ptr={a1:#x}) = {result}");
-				self.machine.set_reg(Reg::A0, result);
+				self.context.set_reg(Reg::A0, result);
 			},
 			SYS_IOCTL => {
 				let result = self.handle_ioctl(a1, a2, a3);
 				log::debug!("Syscall ioctl(fd={a1}, op={a2:#x}, {a3}, {a4}, {a5}) = {result:?}");
-				self.machine.set_reg(Reg::A0, result.into_ret());
+				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			_ => {
 				log::debug!(
 					"Unimplemented syscall: {syscall:>3}, \
                     args = [0x{a1:>016x}, 0x{a2:>016x}, 0x{a3:>016x}, 0x{a4:>016x}, 0x{a5:>016x}]"
 				);
-				self.machine.set_reg(Reg::A0, errno(ENOSYS));
+				self.context.set_reg(Reg::A0, errno(ENOSYS));
 			},
 		}
 		Ok(Continue)
 	}
 
 	fn handle_open(&mut self, path: &CStr, flags: u64) -> Result<u64, Error> {
-		let file = self.fs.open_file(path)?;
+		let file = self.context.open_file(path)?;
 		if (flags & (O_WRONLY | O_RDWR)) != 0 {
 			return Err(Error(EACCES));
 		}
@@ -150,7 +115,7 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 
 	fn handle_openat(&mut self, dirfd: u64, path: u64, flags: u64) -> Result<u64, Error> {
 		if dirfd == AT_FDCWD {
-			let path = self.machine.read_cstring(path, PATH_MAX)?;
+			let path = self.context.read_cstring(path, PATH_MAX)?;
 			self.handle_open(&path, flags)
 		} else {
 			Err(Error(ENOSYS))
@@ -169,9 +134,9 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 		}
 		let buf_len = length.try_into().map_err(|_| Error(EFAULT))?;
 		let mut buf = vec![0_u8; buf_len];
-		let num_bytes_read = self.fs.read(fd, &mut buf)?;
+		let num_bytes_read = self.context.read(fd, &mut buf)?;
 		buf.resize(num_bytes_read as usize, 0_u8);
-		self.machine.write_memory(address, &buf[..])?;
+		self.context.write_memory(address, &buf[..])?;
 		Ok(num_bytes_read)
 	}
 
@@ -182,8 +147,8 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 
 		let mut total_length = 0;
 		for n in 0..iovcnt {
-			let address = self.machine.read_u64(iov.wrapping_add(n * 16))?;
-			let length = self.machine.read_u64(iov.wrapping_add(n * 16).wrapping_add(8))?;
+			let address = self.context.read_u64(iov.wrapping_add(n * 16))?;
+			let length = self.context.read_u64(iov.wrapping_add(n * 16).wrapping_add(8))?;
 			self.handle_read(fd, address, length)?;
 			total_length += length;
 		}
@@ -200,11 +165,11 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 			return Err(Error(EFAULT));
 		}
 
-		let data = self.machine.read_memory(address, length)?;
+		let data = self.context.read_memory(address, length)?;
 
 		match fd {
-			FILENO_STDOUT => self.env.write_to_stdout(&data[..]),
-			FILENO_STDERR => self.env.write_to_stderr(&data[..]),
+			FILENO_STDOUT => self.context.write_to_stdout(&data[..]),
+			FILENO_STDERR => self.context.write_to_stderr(&data[..]),
 			_ => Err(Error(ENOSYS)),
 		}
 	}
@@ -216,8 +181,8 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 
 		let mut total_length = 0;
 		for n in 0..iovcnt {
-			let address = self.machine.read_u64(iov.wrapping_add(n * 16))?;
-			let length = self.machine.read_u64(iov.wrapping_add(n * 16).wrapping_add(8))?;
+			let address = self.context.read_u64(iov.wrapping_add(n * 16))?;
+			let length = self.context.read_u64(iov.wrapping_add(n * 16).wrapping_add(8))?;
 			self.handle_write(fd, address, length)?;
 			total_length += length;
 		}
@@ -235,12 +200,12 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 				return Err(Error(EINVAL));
 			},
 		};
-		self.fs.seek(fd, from)
+		self.context.seek(fd, from)
 	}
 
 	fn handle_set_tid_address(&mut self, thread_id_address: u64) -> Result<u64, Error> {
 		if thread_id_address != 0 {
-			self.machine.write_u32(thread_id_address, THREAD_ID)?;
+			self.context.write_u32(thread_id_address, THREAD_ID)?;
 		}
 		Ok(THREAD_ID.into())
 	}
@@ -256,7 +221,7 @@ impl<M: Machine, E: Environment, F: FileSystem> Kernel<M, E, F> {
 					size_of::<WinSize>(),
 				)
 			};
-			self.machine.write_memory(address, bytes)?;
+			self.context.write_memory(address, bytes)?;
 			return Ok(0);
 		}
 		Err(Error(ENOSYS))
