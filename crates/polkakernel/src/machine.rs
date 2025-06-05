@@ -115,6 +115,8 @@ pub trait Machine {
 
 	fn write_u64(&mut self, address: u64, value: u64) -> Result<(), MachineError>;
 	fn write_u32(&mut self, address: u64, value: u32) -> Result<(), MachineError>;
+	fn write_u16(&mut self, address: u64, value: u16) -> Result<(), MachineError>;
+	fn write_u8(&mut self, address: u64, value: u8) -> Result<(), MachineError>;
 	fn write_memory(&mut self, address: u64, slice: &[u8]) -> Result<(), MachineError>;
 }
 
