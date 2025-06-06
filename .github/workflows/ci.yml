@@ -59,11 +59,11 @@ jobs:
         with:
           submodules: true
       - name: Install dependencies
-        run: . ./ci/brew.sh
+        run: brew install lld@19 llvm@19 automake autoconf libtool
       - name: Install rust-src
         run: rustup component add rust-src
       - name: Check that setup script works
-        run: env CC=clang LD=clang AR=llvm-ar RANLIB=llvm-ranlib ./ci/setup.sh
+        run: env CC=clang LD=clang AR=llvm-ar RANLIB=llvm-ranlib PATH=/opt/homebrew/opt/lld@19:/opt/homebrew/Cellar/llvm@19/19.1.7:"$PATH" ./ci/setup.sh
       - name: Check that our tools work (CoreVM)
         run: ./ci/apps.sh corevm
       - name: Check that our tools work (PolkaVM)
