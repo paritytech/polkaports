@@ -111,8 +111,8 @@ main() {
 	workdir="$(mktemp -d)"
 	for suffix in polkavm corevm; do
 		sysroot="$root"/sysroot-"$suffix"
-		polkatool_install
 		sysroot_init
+		polkatool_install
 		case "$suffix" in
 		polkavm) picoalloc_build polkavm ;;
 		corevm) picoalloc_build corevm --features corevm ;;
