@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  # Run CI on push only for 'main' branch
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  # Run CI on pull request for all branches
+  pull_request:
+    branches: ["**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Check Rust crates
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly
+        run: rustup toolchain install --profile minimal --component rustfmt nightly
+      - name: Install rustfmt, clippy
+        run: rustup component add clippy
+      - name: Run fmt, clippy, tests
+        run: ./ci/rust.sh
+
+  setup-linux:
+    name: Run setup script on Linux
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install dependencies
+        run: sudo apt-get -qq update && sudo apt-get -qq install -y clang-19 lld-19 llvm-19 autotools-dev
+      - name: Install rust-src
+        run: rustup component add rust-src
+      - name: Check that setup script works
+        run: env CC=clang-19 LD=clang-19 AR=llvm-ar-19 RANLIB=llvm-ranlib-19 ./ci/setup.sh
+      - name: Check that our tools work (CoreVM)
+        run: ./ci/apps.sh corevm
+      - name: Check that our tools work (PolkaVM)
+        run: ./ci/apps.sh polkavm
+
+  setup-macos:
+    name: Run setup script on MacOS
+    timeout-minutes: 20
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install dependencies
+        run: ./ci/brew.sh
+      - name: Install rust-src
+        run: rustup component add rust-src
+      - name: Check that setup script works
+        run: env CC=clang LD=clang AR=llvm-ar RANLIB=llvm-ranlib ./ci/setup.sh
+      - name: Check that our tools work (CoreVM)
+        run: ./ci/apps.sh corevm
+      - name: Check that our tools work (PolkaVM)
+        run: ./ci/apps.sh polkavm

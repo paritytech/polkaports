@@ -1,9 +1,21 @@
 #!/bin/bash
 
-AR="${AR:-llvm-ar}"
-LD="${LD:-lld}"
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
+LD="${LD:-lld}"
+AR="${AR:-llvm-ar}"
+RANLIB="${RANLIB:-llvm-ranlib}"
+
+run() {
+    set +e
+    "$@" >"$workdir"/output 2>&1
+    ret="$?"
+    set +e
+    if test "$ret" != 0; then
+        cat "$workdir"/output >&2
+        return 1
+    fi
+}
 
 cleanup() {
 	rm -rf "$workdir"
@@ -31,8 +43,22 @@ picoalloc_build() {
 
 musl_build() {
 	cd "$root"/libs/musl
-	make clean
-	make -j
+	mkdir -p src/malloc/mallocng
+	run env \
+		CFLAGS="-Wno-shift-op-parentheses -Wno-unused-command-line-argument -fpic -fPIE -mrelax --target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -ggdb" \
+		CC="$CC" \
+		AR="$AR" \
+		RANLIB="$RANLIB" \
+		LIBCC="$PWD"/libclang_rt.builtins-riscv64.a \
+		LDFLAGS="-Wl,--emit-relocs -Wl,--no-relax" \
+		./configure \
+		--prefix="$sysroot" \
+		--target=riscv64 \
+		--enable-wrapper=clang \
+		--disable-shared
+	run make clean
+	run make -j
+	run make install
 }
 
 musl_install() {
@@ -133,6 +159,12 @@ EOF
 	sed -e "s|@VENDOR@|$suffix|g" \
 		<"$root"/sdk/riscv64emac-template-linux-musl.json \
 		>"$sysroot"/riscv64emac-"$suffix"-linux-musl.json
+	# clang-18 and clang-19 on Ubuntu wants libgcc
+	# clang-20 on Fedora wants libgcc_s
+	mkdir -p "$sysroot"/lib
+	for name in libgcc_s libgcc; do
+		 touch "$sysroot"/lib/"$name".a
+	done
 }
 
 main() {
@@ -141,8 +173,8 @@ main() {
 	workdir="$(mktemp -d)"
 	for suffix in polkavm corevm; do
 		sysroot="$root"/sysroot-"$suffix"
-		polkatool_install
 		sysroot_init
+		polkatool_install
 		case "$suffix" in
 		polkavm) picoalloc_build polkavm ;;
 		corevm) picoalloc_build corevm --features corevm ;;
