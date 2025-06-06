@@ -1,6 +1,7 @@
 #!/bin/bash
 
 AR="${AR:-llvm-ar}"
+LD="${LD:-lld}"
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
 
