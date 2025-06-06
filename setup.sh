@@ -108,11 +108,11 @@ exec "$CXX" --config=$sysroot/clang.cfg "\$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
 	ln -f "$root"/sdk/clang.cfg "$sysroot"/
-	# clang-18 and clang-19 on Ubuntu wants libgcc.
-	# clang-20 wants libgcc_s
+	# clang-18 and clang-19 on Ubuntu wants libgcc
+	# clang-20 on Fedora wants libgcc_s
 	mkdir -p "$sysroot"/lib
 	for name in libgcc_s libgcc; do
-		>"$sysroot"/lib/"$name".a
+		 touch "$sysroot"/lib/"$name".a
 	done
 }
 
