@@ -78,7 +78,7 @@ $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX): $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf
 	polkatool link $< --output $@ --min-stack-size $(MIN_STACK_SIZE)
 
 $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf: $(QUAKE_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $+
+	$(CC) -v $(CFLAGS) $(LDFLAGS) -o $@ $+
 
 $(OUTPUT)/%.o: %.c
 	@mkdir -p output
