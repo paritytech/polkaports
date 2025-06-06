@@ -54,20 +54,17 @@ jobs:
     name: Run setup script on MacOS
     timeout-minutes: 20
     runs-on: macos-14
-    env:
-      LLVM_PREFIX: /opt/homebrew/Cellar/llvm@19/19.1.7
-      LLD_PREFIX: /opt/homebrew/opt/lld@19
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Install dependencies
-        run: brew install lld@19 llvm@19 automake autoconf libtool
+        run: ./ci/brew.sh
       - name: Install rust-src
         run: rustup component add rust-src
       - name: Check that setup script works
-        run: env CC=clang LD=clang AR=llvm-ar RANLIB=llvm-ranlib PATH="$LLD_PREFIX"/bin:"$LLVM_PREFIX"/bin:"$PATH" ./ci/setup.sh
+        run: env CC=clang LD=clang AR=llvm-ar RANLIB=llvm-ranlib ./ci/setup.sh
       - name: Check that our tools work (CoreVM)
-        run: env PATH="$LLD_PREFIX"/bin:"$LLVM_PREFIX"/bin:"$PATH" ./ci/apps.sh corevm
+        run: ./ci/apps.sh corevm
       - name: Check that our tools work (PolkaVM)
-        run: env PATH="$LLD_PREFIX"/bin:"$LLVM_PREFIX"/bin:"$PATH" ./ci/apps.sh polkavm
+        run: ./ci/apps.sh polkavm
