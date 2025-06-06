@@ -45,3 +45,7 @@ jobs:
         run: rustup component add rust-src
       - name: Check that setup script works
         run: ./ci/setup.sh
+      - name: Check that our tools work (CoreVM)
+        run: ./ci/apps.sh corevm
+      - name: Check that our tools work (PolkaVM)
+        run: ./ci/apps.sh polkavm
