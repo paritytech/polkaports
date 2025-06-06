@@ -1,8 +1,9 @@
 #!/bin/bash
 
-AR="${AR:-llvm-ar}"
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
+AR="${AR:-llvm-ar}"
+RANLIB="${RANLIB:-llvm-ranlib}"
 
 cleanup() {
 	rm -rf "$workdir"
@@ -30,8 +31,22 @@ picoalloc_build() {
 
 musl_build() {
 	cd "$root"/libs/musl
+	mkdir -p src/malloc/mallocng
+	env \
+		CFLAGS="-Wno-shift-op-parentheses -Wno-unused-command-line-argument -fpic -fPIE -mrelax --target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -ggdb" \
+		CC="$CC" \
+		AR="$AR" \
+		RANLIB="$RANLIB" \
+		LIBCC="$PWD"/libclang_rt.builtins-riscv64.a \
+		LDFLAGS="-Wl,--emit-relocs -Wl,--no-relax" \
+		./configure \
+		--prefix="$sysroot" \
+		--target=riscv64 \
+		--enable-wrapper=clang \
+		--disable-shared
 	make clean
 	make -j
+	make install
 }
 
 musl_install() {

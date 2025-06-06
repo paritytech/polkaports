@@ -5,3 +5,4 @@
 *.so.1
 lib/musl-gcc.specs
 /obj/
+/config.mak
