@@ -39,6 +39,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dependencies
         run: sudo apt-get -qq update && sudo apt-get -qq install -y clang lld autotools-dev
+      - name: Install rust-src
+        run: rustup component add rust-src
+      - name: Check tools versions
+        run: clang --version && ld.lld --version
       - name: Run setup script
         run: ./setup.sh
       - name: Compile Quake
