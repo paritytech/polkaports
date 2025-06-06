@@ -1,6 +1,6 @@
 #!/bin/sh
 set -ex
-clang --version
-ld.lld --version
-llvm-ar --version
+"$CC" --version
+"$LD" --version
+"$AR" --version
 ./setup.sh
