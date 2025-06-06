@@ -59,7 +59,7 @@ jobs:
         with:
           submodules: true
       - name: Install dependencies
-        run: brew install lld@19 llvm@19 automake autoconf libtool && export PATH=/opt/homebrew/opt/lld@19/bin:"$PATH" && ls /opt/homebrew/opt/lld@19/bin/*
+        run: brew install lld@19 llvm@19 automake autoconf libtool && export PATH=/opt/homebrew/opt/lld@19/bin:"$PATH" && ls /opt/homebrew/opt/lld@19/bin/* /opt/homebrew/bin/* /opt/homebrew/Cellar/llvm@19/19.1.7/bin/* && echo $PATH
       - name: Install rust-src
         run: rustup component add rust-src
       - name: Check that setup script works
