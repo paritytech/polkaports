@@ -40,7 +40,7 @@ jobs:
         with:
           submodules: true
       - name: Install dependencies
-        run: sudo apt-get -qq update && sudo apt-get -qq install -y clang lld llvm autotools-dev
+        run: sudo apt-get -qq update && sudo apt-get -qq install -y clang-19 lld-19 llvm-19 autotools-dev
       - name: Install rust-src
         run: rustup component add rust-src
       - name: Check that setup script works
