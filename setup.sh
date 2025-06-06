@@ -19,7 +19,7 @@ picoalloc_build() {
 	rm -rf target
 	RUSTC_BOOTSTRAP=1 cargo build \
 		-Zbuild-std=core,alloc \
-        --quiet \
+		--quiet \
 		--package picoalloc_native \
 		--release \
 		--target="$root"/sdk/riscv64emac-unknown-none-polkavm.json \
@@ -82,6 +82,9 @@ exec "$CXX" --config=$sysroot/clang.cfg "\$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
 	ln -f "$root"/sdk/clang.cfg "$sysroot"/
+	# "Install" libgcc_s.
+	mkdir -p "$sysroot"/lib
+	>"$sysroot"/lib/libgcc_s.a
 }
 
 main() {
