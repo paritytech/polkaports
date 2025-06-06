@@ -9,5 +9,6 @@ polkavm | corevm) ;;
 	;;
 esac
 
-export PATH="$PWD"/sysroot-"$suffix"/bin:"$PATH"
 export POLKAPORTS_SUFFIX="$suffix"
+export POLKAPORTS_SYSROOT="$PWD"/sysroot-"$suffix"
+export PATH="$POLKAPORTS_SYSROOT"/bin:"$PATH"

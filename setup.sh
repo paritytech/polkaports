@@ -19,7 +19,7 @@ picoalloc_build() {
 	rm -rf target
 	RUSTC_BOOTSTRAP=1 cargo build \
 		-Zbuild-std=core,alloc \
-        --quiet \
+		--quiet \
 		--package picoalloc_native \
 		--release \
 		--target="$root"/sdk/riscv64emac-unknown-none-polkavm.json \
@@ -68,6 +68,45 @@ musl_install() {
 	done
 }
 
+libunwind_install() {
+	rm -rf "$workdir"/libunwind
+	git clone --depth=1 --branch=v1.8.2 --quiet https://github.com/libunwind/libunwind "$workdir"/libunwind
+	cp "$root"/sdk/stdatomic.h "$sysroot"/include
+	cd "$workdir"/libunwind
+	autoreconf -vif
+	# Disable floating point registers.
+	sed -i -e '/.*error.*Unsupported RISC-V floating-point length.*/d' src/riscv/asm.h
+	sed -i -e 's/.*error.*Unsupported RISC-V floating-point size.*/typedef struct {} unw_tdep_fpreg_t;/' include/libunwind-riscv.h
+	sed -i -e 's/.*error.*FIXME.*/return 0;/' include/tdep-riscv/libunwind_i.h
+	sed -i -e '/.*fpval.*=.*/d' src/riscv/Ginit.c
+	sed -i -e 's/.*error.*Unsupported RISC-V floating point ABI.*/#define JB_MASK_SAVED (208>>3)\n#define JB_MASK (216>>3)/' include/tdep-riscv/jmpbuf.h
+	# Disable s2-s11 registers.
+	for i in 2 3 4 5 6 7 8 9 10 11; do
+		sed -i -e "/.*STORE s$i,.*/d" src/riscv/getcontext.S
+		sed -i -e "/.*LOAD s$i,.*/d" src/riscv/setcontext.S
+	done
+	# Disable a6-a7 registers.
+	for i in 6 7; do
+		sed -i -e "/.*STORE a$i,.*/d" src/riscv/getcontext.S
+		sed -i -e "/.*LOAD a$i,.*/d" src/riscv/setcontext.S
+	done
+	env CC="$sysroot"/bin/polkavm-cc \
+		LD="$sysroot"/bin/polkavm-cc \
+		CPPFLAGS="-D__linux__" \
+		./configure \
+		--prefix="$sysroot" \
+		--disable-shared \
+		--disable-tests \
+		--disable-coredump \
+		--disable-ptrace \
+		--disable-nto \
+		--disable-setjmp \
+		--host riscv64-pc-linux-musl
+	make -j
+	make install
+	cd "$root"
+}
+
 sysroot_init() {
 	rm -rf "$sysroot"/bin
 	mkdir -p "$sysroot"/bin
@@ -81,7 +120,18 @@ EOF
 exec "$CXX" --config=$sysroot/clang.cfg "\$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
+	cat >"$sysroot"/bin/polkavm-lld <<EOF
+#!/bin/sh
+exec "$LD" "\$@" --sysroot="$sysroot" -L$sysroot/lib \
+	$sysroot/lib/Scrt1.o \
+	$sysroot/lib/crti.o \
+	$sysroot/lib/crtn.o
+EOF
+	chmod +x "$sysroot"/bin/polkavm-lld
 	ln -f "$root"/sdk/clang.cfg "$sysroot"/
+	sed -e "s|@VENDOR@|$suffix|g" \
+		<"$root"/sdk/riscv64emac-template-linux-musl.json \
+		>"$sysroot"/riscv64emac-"$suffix"-linux-musl.json
 }
 
 main() {
@@ -98,6 +148,7 @@ main() {
 		esac
 		musl_build
 		musl_install
+		libunwind_install
 	done
 	cat <<'EOF'
 

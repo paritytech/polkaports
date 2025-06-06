@@ -7,5 +7,8 @@ version = "0.1.0"
 
 [workspace]
 resolver = "2"
-members = ["crates/polkakernel"]
+members = [
+    "crates/hello",
+    "crates/polkakernel",
+]
 default-members = ["crates/polkakernel"]

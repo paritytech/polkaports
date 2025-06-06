@@ -15,7 +15,7 @@ to build applications that use the `musl` port.
 
 # Build the toolchain for `polkavm` or `corevm`.
 # Tested on clang-19
-env CC=clang CXX=clang++ ./setup.sh corevm
+env CC=clang CXX=clang++ LD=lld ./setup.sh corevm
 
 # Activate (setup environment variables) for the toolchain.
 # Either `polkavm` or `corevm`.
