@@ -1,7 +1,7 @@
 #!/bin/sh
 set -ex
-"$CC" --version
-"$LD" --version
-"$AR" --version
-"$RANLIB" --version
+for tool in "$CC" "$LD" "$AR" "$RANLIB"; do
+	which "$tool"
+	"$tool" --version
+done
 ./setup.sh
