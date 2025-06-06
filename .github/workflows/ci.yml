@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  # Run CI on push only for 'main' branch
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  # Run CI on pull request for all branches
+  pull_request:
+    branches: ["**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Check formatting
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install rustfmt, clippy
+        run: rustup component add rustfmt clippy
+      - name: Run fmt, clippy, tests
+        run: ./ci/rust.sh
