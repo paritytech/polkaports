@@ -60,7 +60,6 @@ impl FileSystem for StdFileSystem {
 			mode: meta.mode(),
 			id: meta.ino(),
 			block_size: meta.blksize(),
-			num_blocks: meta.blocks(),
 		})
 	}
 

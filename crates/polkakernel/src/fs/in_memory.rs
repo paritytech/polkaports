@@ -63,7 +63,6 @@ impl FileSystem for InMemoryFileSystem {
 				mode: 0o100644,
 				size: blob.len() as u64,
 				block_size: blob.len() as u64,
-				num_blocks: 1,
 			})
 			.ok_or(Error(ENOENT))
 	}

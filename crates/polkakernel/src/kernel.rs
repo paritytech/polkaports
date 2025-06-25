@@ -398,10 +398,11 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 			st_nlink: 1,
 			st_mode: meta.mode,
 			st_blksize: meta.block_size as BlksizeT,
-			st_blocks: meta.num_blocks as BlkcntT,
+			st_blocks: meta.size.div_ceil(512) as BlkcntT,
 			st_size: meta.size as OffT,
 			..Default::default()
 		};
+		log::debug!("{stat:?}");
 		self.context.write_memory(stat_address, as_u8_slice(&stat))?;
 		Ok(())
 	}

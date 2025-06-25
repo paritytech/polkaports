@@ -29,7 +29,6 @@ pub struct Metadata {
 	pub size: u64,
 	pub mode: u32,
 	pub block_size: u64,
-	pub num_blocks: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
