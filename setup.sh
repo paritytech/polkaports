@@ -9,7 +9,7 @@ run() {
     set +e
     "$@" >"$workdir"/output 2>&1
     ret="$?"
-    set +e
+    set -e
     if test "$ret" != 0; then
         cat "$workdir"/output >&2
         return 1
@@ -61,6 +61,7 @@ musl_build() {
 }
 
 musl_install() {
+    # TODO redundant
 	mkdir -p "$sysroot"/include
 	cp -r "$root"/libs/musl/include/* "$sysroot"/include
 	cp -r "$root"/libs/musl/arch/generic/* "$sysroot"/include
@@ -99,19 +100,35 @@ sysroot_init() {
 	mkdir -p "$sysroot"/bin
 	cat >"$sysroot"/bin/polkavm-cc <<EOF
 #!/bin/sh
-exec "$CC" --config=$sysroot/clang.cfg "\$@"
+suffix=
+for x in "\$@"; do
+	case "\$x" in
+	-nostdlib) suffix=-nostdlib ;;
+	*) ;;
+	esac
+done
+exec "$CC" --config=$sysroot/clang\$suffix.cfg "\$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-cc
 	cat >"$sysroot"/bin/polkavm-c++ <<EOF
 #!/bin/sh
-exec "$CXX" --config=$sysroot/clang.cfg "\$@"
+suffix=
+for x in "\$@"; do
+	case "\$x" in
+	-nostdlib) suffix=-nostdlib ;;
+	*) ;;
+	esac
+done
+exec "$CXX" --config=$sysroot/clang\$suffix.cfg "\$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
 	ln -f "$root"/sdk/clang.cfg "$sysroot"/
-	# clang-18 and clang-19 on Ubuntu wants libgcc
+	ln -f "$root"/sdk/clang-nostdlib.cfg "$sysroot"/
+	# clang-18 and clang-19 on Ubuntu want libgcc
 	# clang-20 on Fedora wants libgcc_s
+    # busybox wants libgcc_eh
 	mkdir -p "$sysroot"/lib
-	for name in libgcc_s libgcc; do
+	for name in libgcc_s libgcc libgcc_eh; do
 		 touch "$sysroot"/lib/"$name".a
 	done
 }

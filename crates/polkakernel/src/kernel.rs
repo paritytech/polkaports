@@ -31,6 +31,8 @@ pub struct Kernel<C: Machine + Environment + FileSystem> {
 	pub context: C,
 	/// Persistent state.
 	pub state: KernelState<C::Fd>,
+	pub uid: u32,
+	pub gid: u32,
 }
 
 impl<C: Machine + Environment + FileSystem> Kernel<C> {
@@ -43,52 +45,111 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		let a5 = self.context.reg(Reg::A5);
 		match syscall {
 			SYS_READ => {
-				let result = self.handle_read(a1, a2, a3).into_ret();
-				log::trace!("Syscall read(fd={a1}, address={a2:#x}, length={a3}) = {result}");
-				self.context.set_reg(Reg::A0, result);
+				let result = self.handle_read(a1, a2, a3);
+				log::trace!("Syscall read(fd={a1}, address={a2:#x}, length={a3}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_READV => {
-				let result = self.handle_readv(a1, a2, a3).into_ret();
-				log::trace!("Syscall readv(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result}");
-				self.context.set_reg(Reg::A0, result);
+				let result = self.handle_readv(a1, a2, a3);
+				log::trace!("Syscall readv(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_WRITE => {
-				let result = self.handle_write(a1, a2, a3).into_ret();
-				log::trace!("Syscall write(fd={a1}, address={a2:#x}, length={a3}) = {result}");
-				self.context.set_reg(Reg::A0, result);
+				let result = self.handle_write(a1, a2, a3);
+				log::trace!("Syscall write(fd={a1}, address={a2:#x}, length={a3}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_WRITEV => {
-				let result = self.handle_writev(a1, a2, a3).into_ret();
-				log::trace!("Syscall writev(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result}");
-				self.context.set_reg(Reg::A0, result);
+				let result = self.handle_writev(a1, a2, a3);
+				log::trace!("Syscall writev(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_EXIT => {
-				log::info!("Syscall exit(status={a1})");
+				log::trace!("Syscall exit(status={a1})");
+				return Ok(Exit(a1 as u8));
+			},
+			SYS_EXIT_GROUP => {
+				log::trace!("Syscall exit_group(status={a1})");
 				return Ok(Exit(a1 as u8));
 			},
 			SYS_OPENAT => {
-				let result = self.handle_openat(a1, a2, a3).into_ret();
-				log::trace!("Syscall openat(dirfd={a1}, path={a2:#x}, flags={a3:#o}) = {result}");
-				self.context.set_reg(Reg::A0, result);
+				let result = self.handle_openat(a1, a2, a3);
+				log::trace!("Syscall openat(dirfd={a1}, path={a2:#x}, flags={a3:#o}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_LSEEK => {
-				let result = self.handle_lseek(a1, a2 as i64, a3).into_ret();
-				log::trace!("Syscall lseek(fd={a1}, offset={a2}, whence={a3}) = {result}");
-				self.context.set_reg(Reg::A0, result);
+				let result = self.handle_lseek(a1, a2 as i64, a3);
+				log::trace!("Syscall lseek(fd={a1}, offset={a2}, whence={a3}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_CLOSE => {
-				let result = self.handle_close(a1).into_ret();
-				log::trace!("Syscall close(fd={a1}) = {result}");
-				self.context.set_reg(Reg::A0, result);
+				let result = self.handle_close(a1);
+				log::trace!("Syscall close(fd={a1}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_SET_TID_ADDRESS => {
-				let result = self.handle_set_tid_address(a1).into_ret();
-				log::trace!("Syscall set_tid_address(tid_ptr={a1:#x}) = {result}");
-				self.context.set_reg(Reg::A0, result);
+				let result = self.handle_set_tid_address(a1);
+				log::trace!("Syscall set_tid_address(tid_ptr={a1:#x}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_IOCTL => {
 				let result = self.handle_ioctl(a1, a2, a3);
 				log::debug!("Syscall ioctl(fd={a1}, op={a2:#x}, {a3}, {a4}, {a5}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_GETUID => {
+				let result = self.handle_getuid();
+				log::debug!("Syscall getuid() = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_GETEUID => {
+				let result = self.handle_geteuid();
+				log::debug!("Syscall geteuid() = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_GETGID => {
+				let result = self.handle_getgid();
+				log::debug!("Syscall getgid() = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_GETEGID => {
+				let result = self.handle_getegid();
+				log::debug!("Syscall getegid() = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_SETUID => {
+				let result = self.handle_setuid(a1);
+				log::debug!("Syscall setuid({a1}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_SETGID => {
+				let result = self.handle_setgid(a1);
+				log::debug!("Syscall setgid({a1}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_UNAME => {
+				let result = self.handle_uname(a1);
+				log::debug!("Syscall uname({a1:#x}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_NEWFSTATAT => {
+				let result = self.handle_newfstatat(a1, a2, a3, a4);
+				log::debug!("Syscall newfstatat(dirfd={a1}, path={a2:#x}, stat={a3:#x}, flags={a4:#x}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_CLOCK_GETTIME => {
+				let result = self.handle_clock_gettime(a1, a2);
+				log::debug!("Syscall clock_gettime({a1}, {a2:#x}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_FCNTL => {
+				let result = self.handle_fcntl(a1, a2, a3);
+				log::debug!("Syscall fcntl(fd={a1}, op={a2}, {a3}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_GETDENTS64 => {
+				let result = self.handle_getdents64(a1, a2, a3);
+				log::debug!("Syscall getdents64(fd={a1}, buf={a2:#x}, size={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			_ => {
@@ -103,10 +164,10 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 	}
 
 	fn handle_open(&mut self, path: &CStr, flags: u64) -> Result<u64, Error> {
-		let file = self.context.open_file(path)?;
 		if (flags & (O_WRONLY | O_RDWR)) != 0 {
 			return Err(Error(EACCES));
 		}
+		let file = self.context.open(path, flags)?;
 		let fd = RESERVED_FD_COUNT + self.state.next_fd;
 		self.state.next_fd += 1;
 		self.state.fds.insert(fd, file);
@@ -122,9 +183,9 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		}
 	}
 
-	fn handle_close(&mut self, fd: u64) -> Result<u64, Error> {
+	fn handle_close(&mut self, fd: u64) -> Result<(), Error> {
 		self.state.fds.remove(&fd).ok_or(Error(EBADF))?;
-		Ok(0)
+		Ok(())
 	}
 
 	fn handle_read(&mut self, fd: u64, address: u64, length: u64) -> Result<u64, Error> {
@@ -137,7 +198,7 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		let num_bytes_read = self.context.read(fd, &mut buf)?;
 		buf.resize(num_bytes_read as usize, 0_u8);
 		self.context.write_memory(address, &buf[..])?;
-		Ok(num_bytes_read)
+		Ok(num_bytes_read as u64)
 	}
 
 	fn handle_readv(&mut self, fd: u64, iov: u64, iovcnt: u64) -> Result<u64, Error> {
@@ -210,22 +271,145 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		Ok(THREAD_ID.into())
 	}
 
-	fn handle_ioctl(&mut self, _fd: u64, op: u64, arg0: u64) -> Result<u64, Error> {
+	fn handle_ioctl(&mut self, _fd: u64, op: u64, arg0: u64) -> Result<(), Error> {
 		if op == TIOCGWINSZ {
 			// NOTE This is a stub to make Musl's `__stdout_write` use line buffering.
 			let address = arg0;
 			let vt100_size = WinSize { col: 80, row: 25, xpixel: 0, ypixel: 0 };
-			let bytes = unsafe {
-				core::slice::from_raw_parts(
-					core::ptr::from_ref(&vt100_size).cast::<u8>(),
-					size_of::<WinSize>(),
-				)
-			};
-			self.context.write_memory(address, bytes)?;
-			return Ok(0);
+			self.context.write_memory(address, as_u8_slice(&vt100_size))?;
+			return Ok(());
 		}
 		Err(Error(ENOSYS))
 	}
+
+	fn handle_fcntl(&mut self, fd: u64, op: u64, arg0: u64) -> Result<(), Error> {
+		if !self.state.fds.contains_key(&fd) {
+			return Err(Error(EBADF));
+		}
+		match (op, arg0) {
+			(F_SETFD, FD_CLOEXEC) => Ok(()),
+			_ => Err(Error(ENOSYS)),
+		}
+	}
+
+	fn handle_getuid(&mut self) -> Result<u32, Error> {
+		Ok(self.uid)
+	}
+
+	fn handle_geteuid(&mut self) -> Result<u32, Error> {
+		Ok(self.uid)
+	}
+
+	fn handle_getgid(&mut self) -> Result<u32, Error> {
+		Ok(self.gid)
+	}
+
+	fn handle_getegid(&mut self) -> Result<u32, Error> {
+		Ok(self.gid)
+	}
+
+	fn handle_setuid(&mut self, uid: u64) -> Result<(), Error> {
+		if uid == u64::from(self.uid) {
+			Ok(())
+		} else {
+			Err(Error(ENOSYS))
+		}
+	}
+
+	fn handle_setgid(&mut self, gid: u64) -> Result<(), Error> {
+		if gid == u64::from(self.gid) {
+			Ok(())
+		} else {
+			Err(Error(ENOSYS))
+		}
+	}
+
+	fn handle_uname(&mut self, address: u64) -> Result<(), Error> {
+		if address == 0 {
+			return Err(Error(EFAULT));
+		}
+		let utsname = Utsname {
+			// This should always equal "Linux" because some programs depend on this exact value.
+			sysname: utsname_field!(b"Linux"),
+			nodename: utsname_field!(b"node"),
+			// Crate version.
+			version: utsname_field!(concat!(
+				env!("CARGO_PKG_NAME"),
+				"-",
+				env!("CARGO_PKG_VERSION")
+			)
+			.as_bytes()),
+			// Linux version. See `sdk/riscv64-include/linux/version.h`.
+			release: utsname_field!(b"6.1.4"),
+			machine: utsname_field!(b"riscv64emac"),
+			domainname: [0_u8; 65],
+		};
+		self.context.write_memory(address, as_u8_slice(&utsname))?;
+		Ok(())
+	}
+
+	fn handle_newfstatat(
+		&mut self,
+		_dirfd: u64,
+		path_address: u64,
+		stat_address: u64,
+		_flags: u64,
+	) -> Result<(), Error> {
+		if path_address == 0 || stat_address == 0 {
+			return Err(Error(EFAULT));
+		}
+		let path = self.context.read_cstring(path_address, PATH_MAX)?;
+		let meta = self.context.metadata(&path).map_err(|_| Error(ENOENT))?;
+		let stat = Stat {
+			st_dev: 0,
+			st_ino: meta.id,
+			st_rdev: 0,
+			st_uid: 0,
+			st_gid: 0,
+			st_nlink: 1,
+			st_mode: meta.mode,
+			st_blksize: meta.block_size as BlksizeT,
+			st_blocks: meta.num_blocks as BlkcntT,
+			st_size: meta.size as OffT,
+			..Default::default()
+		};
+		self.context.write_memory(stat_address, as_u8_slice(&stat))?;
+		Ok(())
+	}
+
+	fn handle_clock_gettime(&mut self, _clock_id: u64, address: u64) -> Result<(), Error> {
+		if address == 0 {
+			return Err(Error(EFAULT));
+		}
+		let ts = Timespec { tv_sec: 0, tv_nsec: 0 };
+		self.context.write_memory(address, as_u8_slice(&ts))?;
+		Ok(())
+	}
+
+	fn handle_getdents64(
+		&mut self,
+		fd: u64,
+		buf_address: u64,
+		buf_size: u64,
+	) -> Result<u64, Error> {
+		let fd = self.state.fds.get_mut(&fd).ok_or(Error(EBADF))?;
+		let buf_size = buf_size as usize;
+		let mut buf = vec![0_u8; buf_size];
+		let mut offset = 0;
+		while offset != buf_size {
+			let n = self.context.read_dir(fd, &mut buf[offset..])?;
+			if n == 0 {
+				break;
+			}
+			offset += n;
+		}
+		self.context.write_memory(buf_address, &buf[..offset])?;
+		Ok(offset as u64)
+	}
+}
+
+fn as_u8_slice<T>(value: &T) -> &[u8] {
+	unsafe { core::slice::from_raw_parts(core::ptr::from_ref(value).cast::<u8>(), size_of::<T>()) }
 }
 
 #[derive(Debug)]

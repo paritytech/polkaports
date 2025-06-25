@@ -1,7 +1,7 @@
 use alloc::{borrow::Cow, collections::BTreeMap, ffi::CString, sync::Arc};
 use core::ffi::CStr;
 
-use crate::{libc::*, normalize_path, Error, FileSystem, SeekFrom};
+use crate::{libc::*, normalize_path, Error, FileSystem, Metadata, SeekFrom};
 
 pub type FileBlob = Cow<'static, [u8]>;
 pub type InMemoryFileSystem = BTreeMap<CString, Arc<FileBlob>>;
@@ -14,7 +14,7 @@ pub enum InMemoryError {
 impl FileSystem for InMemoryFileSystem {
 	type Fd = InMemoryFd;
 
-	fn open_file(&mut self, path: &CStr) -> Result<Self::Fd, Error> {
+	fn open(&mut self, path: &CStr, _flags: u64) -> Result<Self::Fd, Error> {
 		let path = normalize_path(path);
 		Self::get(self, &path)
 			.cloned()
@@ -35,7 +35,7 @@ impl FileSystem for InMemoryFileSystem {
 		Ok(fd.position)
 	}
 
-	fn read(&mut self, fd: &mut InMemoryFd, buf: &mut [u8]) -> Result<u64, Error> {
+	fn read(&mut self, fd: &mut InMemoryFd, buf: &mut [u8]) -> Result<usize, Error> {
 		let size = fd.size();
 		let end = core::cmp::min(fd.position.wrapping_add(buf.len() as u64), size);
 		if fd.position >= end || fd.position >= size {
@@ -43,16 +43,33 @@ impl FileSystem for InMemoryFileSystem {
 			return Ok(0);
 		}
 		let slice = &fd.blob[fd.position as usize..end as usize];
-		let num_bytes_read = slice.len() as u64;
+		let num_bytes_read = slice.len();
 		buf.copy_from_slice(slice);
 		log::trace!(
 			"  -> offset={}, length={}, new offset={}",
 			fd.position,
 			num_bytes_read,
-			fd.position + num_bytes_read
+			fd.position + num_bytes_read as u64
 		);
-		fd.position += num_bytes_read;
+		fd.position += num_bytes_read as u64;
 		Ok(num_bytes_read)
+	}
+
+	fn metadata(&mut self, path: &CStr) -> Result<Metadata, Error> {
+		let path = normalize_path(path);
+		Self::get(self, &path)
+			.map(|blob| Metadata {
+				id: blob.as_ptr() as u64,
+				mode: 0o100644,
+				size: blob.len() as u64,
+				block_size: blob.len() as u64,
+				num_blocks: 1,
+			})
+			.ok_or(Error(ENOENT))
+	}
+
+	fn read_dir(&mut self, _fd: &mut Self::Fd, _buf: &mut [u8]) -> Result<usize, Error> {
+		Err(Error(ENOSYS))
 	}
 }
 

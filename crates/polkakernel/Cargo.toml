@@ -9,7 +9,8 @@ version.workspace = true
 
 [features]
 default = []
-std = ["log/std"]
+std = ["log/std", "dep:libc"]
 
 [dependencies]
+libc = { version = "0.2.174", optional = true }
 log = { version = "0.4.27", features = [], default-features = false }
