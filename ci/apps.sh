@@ -7,8 +7,8 @@ main() {
 	root="$PWD"
 	workdir="$(mktemp -d)"
 	trap cleanup EXIT
-	build_quake
-	build_busybox
+	run build_quake
+	run build_busybox
 }
 
 build_quake() {
