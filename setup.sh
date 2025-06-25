@@ -6,14 +6,14 @@ AR="${AR:-llvm-ar}"
 RANLIB="${RANLIB:-llvm-ranlib}"
 
 run() {
-    set +e
-    "$@" >"$workdir"/output 2>&1
-    ret="$?"
-    set -e
-    if test "$ret" != 0; then
-        cat "$workdir"/output >&2
-        return 1
-    fi
+	set +e
+	"$@" >"$workdir"/output 2>&1
+	ret="$?"
+	set -e
+	if test "$ret" != 0; then
+		cat "$workdir"/output >&2
+		return 1
+	fi
 }
 
 cleanup() {
@@ -61,7 +61,7 @@ musl_build() {
 }
 
 musl_install() {
-    # TODO redundant
+	# TODO redundant
 	mkdir -p "$sysroot"/include
 	cp -r "$root"/libs/musl/include/* "$sysroot"/include
 	cp -r "$root"/libs/musl/arch/generic/* "$sysroot"/include
@@ -126,10 +126,10 @@ EOF
 	ln -f "$root"/sdk/clang-nostdlib.cfg "$sysroot"/
 	# clang-18 and clang-19 on Ubuntu want libgcc
 	# clang-20 on Fedora wants libgcc_s
-    # busybox wants libgcc_eh
+	# busybox wants libgcc_eh
 	mkdir -p "$sysroot"/lib
 	for name in libgcc_s libgcc libgcc_eh; do
-		 touch "$sysroot"/lib/"$name".a
+		touch "$sysroot"/lib/"$name".a
 	done
 }
 
@@ -137,6 +137,7 @@ main() {
 	PS4='$0:$LINENO: 🏗️  ' set -ex
 	root="$PWD"
 	workdir="$(mktemp -d)"
+	trap cleanup EXIT
 	for suffix in polkavm corevm; do
 		sysroot="$root"/sysroot-"$suffix"
 		sysroot_init
