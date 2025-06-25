@@ -21,13 +21,13 @@ main() {
 	cd "$workdir"/busybox
 	make defconfig
 	# Override default configuration.
-	sed -i.bak \
+	sed -i \
 		-e 's/.*\bCONFIG_STATIC\b.*/CONFIG_STATIC=y/g' \
 		-e 's/.*\bCONFIG_SHA1_HWACCEL\b.*/CONFIG_SHA1_HWACCEL=n/g' \
 		-e 's/.*\bCONFIG_SHA256_HWACCEL\b.*/CONFIG_SHA256_HWACCEL=n/g' \
 		.config
 	# Override tools.
-	sed -i.bak \
+	sed -i \
 		-e 's|\bHOSTCC\s*=.*|HOSTCC = '"$CC"'|g' \
 		-e 's|\bHOSTCXX\s*=.*|HOSTCXX = '"$CXX"'|g' \
 		-e 's|\bAS\s*=.*|AS = '"$AS"'|g' \
@@ -40,9 +40,9 @@ main() {
 		-e 's|\bKBUILD_VERBOSE\s*=.*|KBUILD_VERBOSE = 1|g' \
 		Makefile
 	# Remove flags unsupported by clang.
-	sed -i.bak -e '/-fno-guess-branch-probability/d' Makefile.flags
+	sed -i -e '/-fno-guess-branch-probability/d' Makefile.flags
 	# Remove linker flags unsupported by polkatool.
-	sed -i.bak \
+	sed -i \
 		-e 's/\bSORT_COMMON=.*/SORT_COMMON=/' \
 		-e 's/\bSORT_SECTION=.*/SORT_SECTION=/' \
 		-e 's/\bGC_SECTIONS=.*/GC_SECTIONS=/' \

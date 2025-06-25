@@ -2,12 +2,14 @@
 set -ex
 
 # Install dependencies.
-brew install lld@19 llvm@19 automake autoconf libtool
+brew install lld@19 llvm@19 automake autoconf libtool gnu-sed
 
 # Add new commands to PATH.
-llvm_prefix=/opt/homebrew/Cellar/llvm@19/19.1.7
-lld_prefix=/opt/homebrew/opt/lld@19
-for prefix in "$llvm_prefix" "$lld_prefix"; do
+prefix=/opt/homebrew
+for prefix in \
+	"$prefix"/Cellar/llvm@19/19.1.7 \
+	"$prefix"/opt/lld@19 \
+	"$prefix"/opt/gnu-sed/libexec/gnubin; do
 	if ! test -e "$prefix"/bin; then
 		printf "Directory %s doesn't exist.\n" "$prefix"/bin >&2
 		exit 1
