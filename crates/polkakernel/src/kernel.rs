@@ -74,7 +74,6 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 			},
 			SYS_OPENAT => {
 				let result = self.handle_openat(a1, a2, a3);
-				log::trace!("Syscall openat(dirfd={a1}, path={a2:#x}, flags={a3:#o}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_LSEEK => {
@@ -134,7 +133,6 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 			},
 			SYS_NEWFSTATAT => {
 				let result = self.handle_newfstatat(a1, a2, a3, a4);
-				log::debug!("Syscall newfstatat(dirfd={a1}, path={a2:#x}, stat={a3:#x}, flags={a4:#x}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_CLOCK_GETTIME => {
@@ -150,6 +148,10 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 			SYS_GETDENTS64 => {
 				let result = self.handle_getdents64(a1, a2, a3);
 				log::debug!("Syscall getdents64(fd={a1}, buf={a2:#x}, size={a3}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_FACCESSAT => {
+				let result = self.handle_faccessat(a1, a2, a3, a4);
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			_ => {
@@ -175,12 +177,22 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 	}
 
 	fn handle_openat(&mut self, dirfd: u64, path: u64, flags: u64) -> Result<u64, Error> {
-		if dirfd == AT_FDCWD {
-			let path = self.context.read_cstring(path, PATH_MAX)?;
-			self.handle_open(&path, flags)
-		} else {
-			Err(Error(ENOSYS))
+		let path = self.context.read_cstring(path, PATH_MAX)?;
+		let dirfd = dirfd as i64 as i32;
+		let result = self.do_handle_openat(dirfd, &path, flags);
+		log::trace!(
+			"Syscall openat(dirfd={}, path={path:?}, flags={flags:#o}) = {result:?}",
+			DebugDirFd(dirfd)
+		);
+		result
+	}
+
+	#[inline]
+	fn do_handle_openat(&mut self, dirfd: i32, path: &CStr, flags: u64) -> Result<u64, Error> {
+		if dirfd != AT_FDCWD {
+			return Err(Error(ENOSYS));
 		}
+		self.handle_open(path, flags)
 	}
 
 	fn handle_close(&mut self, fd: u64) -> Result<(), Error> {
@@ -350,16 +362,33 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 
 	fn handle_newfstatat(
 		&mut self,
-		_dirfd: u64,
+		dirfd: u64,
 		path_address: u64,
+		stat_address: u64,
+		flags: u64,
+	) -> Result<(), Error> {
+		let dirfd = dirfd as i64 as i32;
+		let path = self.context.read_cstring(path_address, PATH_MAX)?;
+		let result = self.do_handle_newfstatat(dirfd, &path, stat_address, flags);
+		log::debug!(
+			"Syscall newfstatat(dirfd={}, path={path:?}, stat={stat_address:#x}, flags={flags:#x}) = {result:?}",
+			DebugDirFd(dirfd)
+		);
+		result
+	}
+
+	#[inline]
+	fn do_handle_newfstatat(
+		&mut self,
+		dirfd: i32,
+		path: &CStr,
 		stat_address: u64,
 		_flags: u64,
 	) -> Result<(), Error> {
-		if path_address == 0 || stat_address == 0 {
-			return Err(Error(EFAULT));
+		if dirfd != AT_FDCWD {
+			return Err(Error(ENOSYS));
 		}
-		let path = self.context.read_cstring(path_address, PATH_MAX)?;
-		let meta = self.context.metadata(&path).map_err(|_| Error(ENOENT))?;
+		let meta = self.context.metadata(path).map_err(|_| Error(ENOENT))?;
 		let stat = Stat {
 			st_dev: 0,
 			st_ino: meta.id,
@@ -406,10 +435,58 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		self.context.write_memory(buf_address, &buf[..offset])?;
 		Ok(offset as u64)
 	}
+
+	fn handle_faccessat(
+		&mut self,
+		dirfd: u64,
+		path_address: u64,
+		mode: u64,
+		flags: u64,
+	) -> Result<(), Error> {
+		let path = self.context.read_cstring(path_address, PATH_MAX)?;
+		let dirfd = dirfd as i64 as i32;
+		let mode = mode as u32;
+		let result = self.do_handle_faccessat(dirfd, &path, mode, flags);
+		log::debug!(
+			"Syscall faccessat(dirfd={}, path={path:?}, mode={mode:#o}, flags={flags:#x}) = {result:?}",
+            DebugDirFd(dirfd)
+		);
+		result
+	}
+
+	#[inline]
+	fn do_handle_faccessat(
+		&mut self,
+		dirfd: i32,
+		path: &CStr,
+		mode: u32,
+		_flags: u64,
+	) -> Result<(), Error> {
+		if dirfd != AT_FDCWD {
+			return Err(Error(ENOSYS));
+		}
+		let meta = self.context.metadata(path)?;
+		if meta.mode & mode == mode {
+			return Ok(())
+		}
+		Err(Error(EACCES))
+	}
 }
 
 fn as_u8_slice<T>(value: &T) -> &[u8] {
 	unsafe { core::slice::from_raw_parts(core::ptr::from_ref(value).cast::<u8>(), size_of::<T>()) }
+}
+
+struct DebugDirFd(i32);
+
+impl core::fmt::Display for DebugDirFd {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+		if self.0 == AT_FDCWD {
+			f.write_str("AT_FDCWD")
+		} else {
+			write!(f, "{}", self.0)
+		}
+	}
 }
 
 #[derive(Debug)]

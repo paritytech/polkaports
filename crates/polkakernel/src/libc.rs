@@ -2,7 +2,7 @@
 
 #![allow(unused)]
 
-pub const AT_FDCWD: u64 = (-100_i64) as u64;
+pub const AT_FDCWD: i32 = -100_i32;
 pub const AT_PAGESZ: u64 = 6;
 
 pub const EACCES: u64 = 13;
@@ -58,6 +58,7 @@ pub const SYS_UNAME: u64 = 160;
 pub const SYS_NEWFSTATAT: u64 = 79;
 pub const SYS_CLOCK_GETTIME: u64 = 113;
 pub const SYS_GETDENTS64: u64 = 61;
+pub const SYS_FACCESSAT: u64 = 48;
 
 pub const TIOCGWINSZ: u64 = 0x5413;
 
