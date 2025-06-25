@@ -6,13 +6,13 @@ brew install lld@19 llvm@19 automake autoconf libtool gnu-sed
 
 # Add new commands to PATH.
 prefix=/opt/homebrew
-for prefix in \
-	"$prefix"/Cellar/llvm@19/19.1.7 \
-	"$prefix"/opt/lld@19 \
+for bin in \
+	"$prefix"/Cellar/llvm@19/19.1.7/bin \
+	"$prefix"/opt/lld@19/bin \
 	"$prefix"/opt/gnu-sed/libexec/gnubin; do
-	if ! test -e "$prefix"/bin; then
-		printf "Directory %s doesn't exist.\n" "$prefix"/bin >&2
+	if ! test -e "$bin"; then
+		printf "Directory %s doesn't exist.\n" "$bin" >&2
 		exit 1
 	fi
-	printf "%s\n" "$prefix"/bin >>"$GITHUB_PATH"
+	printf "%s\n" "$bin" >>"$GITHUB_PATH"
 done
