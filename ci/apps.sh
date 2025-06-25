@@ -20,4 +20,4 @@ main() {
     build_busybox
 }
 
-main
+main "$@"
