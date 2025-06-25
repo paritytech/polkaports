@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# A mirror of https://git.busybox.net/busybox that can keep up with the load.
+url=https://github.com/igankevich/busybox
 version=1_37_0
 polkatool_args="--min-stack-size 65536"
 
@@ -17,7 +19,7 @@ main() {
 	workdir="$(mktemp -d)"
 	trap cleanup EXIT
 	root="$PWD"
-	git clone --depth=1 --branch="$version" https://git.busybox.net/busybox "$workdir"/busybox
+	git clone --depth=1 --branch="$version" "$url" "$workdir"/busybox
 	cd "$workdir"/busybox
 	make defconfig
 	# Override default configuration.
