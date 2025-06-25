@@ -196,7 +196,7 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		let buf_len = length.try_into().map_err(|_| Error(EFAULT))?;
 		let mut buf = vec![0_u8; buf_len];
 		let num_bytes_read = self.context.read(fd, &mut buf)?;
-		buf.resize(num_bytes_read as usize, 0_u8);
+		buf.resize(num_bytes_read, 0_u8);
 		self.context.write_memory(address, &buf[..])?;
 		Ok(num_bytes_read as u64)
 	}
