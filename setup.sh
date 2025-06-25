@@ -61,13 +61,8 @@ musl_build() {
 }
 
 musl_install() {
-	# TODO redundant
-	mkdir -p "$sysroot"/include
-	cp -r "$root"/libs/musl/include/* "$sysroot"/include
-	cp -r "$root"/libs/musl/arch/generic/* "$sysroot"/include
-	cp -r "$root"/libs/musl/arch/riscv64/* "$sysroot"/include
-	cp -r "$root"/libs/musl/obj/include/* "$sysroot"/include
-
+    # Install RISCV Linux headers.
+    cp -r "$root"/sdk/riscv64-include/* "$sysroot"/include/
 	# Install CoreVM-specific headers.
 	case "$suffix" in
 	polkavm) ;;

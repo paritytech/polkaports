@@ -51,7 +51,7 @@ main() {
 		scripts/trylink
 	# Override some definitions in the Makefile.
 	cat >>Makefile.flags <<EOF
-CPPFLAGS += -I$root/../../sdk/riscv64-include -D__linux__
+CPPFLAGS += -D__linux__
 CFLAGS += -flto
 EOF
 	make V=1 busybox
