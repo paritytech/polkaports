@@ -68,6 +68,7 @@ musl_install() {
 	polkavm) ;;
 	corevm) ln -f "$root"/sdk/corevm_guest.h "$sysroot"/include/ ;;
 	esac
+    cp "$root"/libs/musl/arch/riscv64/polkavm_guest.h "$sysroot"/include/
 
 	mkdir -p "$sysroot"/lib
 	cp "$root"/libs/musl/lib/*.a "$sysroot"/lib
