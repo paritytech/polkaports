@@ -9,13 +9,11 @@ use SyscallOutcome::*;
 
 pub struct KernelState<Fd> {
 	pub fds: BTreeMap<u64, Fd>,
-	/// The next file descriptor after reserved ones.
-	pub next_fd: u64,
 }
 
 impl<Fd> KernelState<Fd> {
 	pub fn new() -> Self {
-		Self { fds: BTreeMap::new(), next_fd: 0 }
+		Self { fds: BTreeMap::new() }
 	}
 }
 
@@ -31,11 +29,16 @@ pub struct Kernel<C: Machine + Environment + FileSystem> {
 	pub context: C,
 	/// Persistent state.
 	pub state: KernelState<C::Fd>,
-	pub uid: u32,
-	pub gid: u32,
+	uid: u32,
+	gid: u32,
+	max_fd: Option<u64>,
 }
 
 impl<C: Machine + Environment + FileSystem> Kernel<C> {
+	pub fn new(context: C, state: KernelState<C::Fd>) -> Self {
+		Self { context, state, uid: 0, gid: 0, max_fd: None }
+	}
+
 	pub fn handle_syscall(&mut self) -> Result<SyscallOutcome, MachineError> {
 		let syscall = self.context.reg(Reg::A0);
 		let a1 = self.context.reg(Reg::A1);
@@ -154,6 +157,16 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 				let result = self.handle_faccessat(a1, a2, a3, a4);
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
+			SYS_GETGROUPS => {
+				let result = self.handle_getgroups(a1, a2);
+				log::debug!("Syscall getgroups(size={a1}, list={a2:#x}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_SYNC => {
+				let result = Ok(());
+				log::debug!("Syscall sync() = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
 			_ => {
 				log::debug!(
 					"Unimplemented syscall: {syscall:>3}, \
@@ -170,8 +183,12 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 			return Err(Error(EACCES));
 		}
 		let file = self.context.open(path, flags)?;
-		let fd = RESERVED_FD_COUNT + self.state.next_fd;
-		self.state.next_fd += 1;
+		let max_fd = match self.max_fd {
+			Some(ref mut max_fd) => max_fd,
+			ref mut p @ None => p.insert(self.state.fds.keys().copied().max().unwrap_or(0)),
+		};
+		*max_fd += 1;
+		let fd = MAX_RESERVED_FD + *max_fd;
 		self.state.fds.insert(fd, file);
 		Ok(fd)
 	}
@@ -196,8 +213,10 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 	}
 
 	fn handle_close(&mut self, fd: u64) -> Result<(), Error> {
-		self.state.fds.remove(&fd).ok_or(Error(EBADF))?;
-		Ok(())
+		if self.state.fds.remove(&fd).is_some() {
+			return Ok(());
+		}
+		Err(Error(EBADF))
 	}
 
 	fn handle_read(&mut self, fd: u64, address: u64, length: u64) -> Result<u64, Error> {
@@ -334,6 +353,14 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		} else {
 			Err(Error(ENOSYS))
 		}
+	}
+
+	fn handle_getgroups(&mut self, size: u64, address: u64) -> Result<u64, Error> {
+		if size == 0 {
+			return Ok(1);
+		}
+		self.context.write_u32(address, self.gid)?;
+		Ok(1)
 	}
 
 	fn handle_uname(&mut self, address: u64) -> Result<(), Error> {
@@ -499,4 +526,4 @@ pub enum SyscallOutcome {
 const THREAD_ID: u32 = 1;
 
 /// 0, 1, 2 are reserved.
-const RESERVED_FD_COUNT: u64 = 3;
+const MAX_RESERVED_FD: u64 = 2;

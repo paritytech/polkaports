@@ -59,6 +59,9 @@ pub const SYS_NEWFSTATAT: u64 = 79;
 pub const SYS_CLOCK_GETTIME: u64 = 113;
 pub const SYS_GETDENTS64: u64 = 61;
 pub const SYS_FACCESSAT: u64 = 48;
+pub const SYS_GETGROUPS: u64 = 158;
+pub const SYS_SYNC: u64 = 81;
+pub const SYS_DUP3: u64 = 24;
 
 pub const TIOCGWINSZ: u64 = 0x5413;
 
