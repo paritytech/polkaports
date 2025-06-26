@@ -15,8 +15,8 @@ pub const ENOENT: u64 = 2;
 pub const ENOSYS: u64 = 38;
 pub const EISDIR: u64 = 21;
 
-pub const FILENO_STDERR: u64 = 2;
-pub const FILENO_STDOUT: u64 = 1;
+pub const FILENO_STDERR: u32 = 2;
+pub const FILENO_STDOUT: u32 = 1;
 
 pub const IOV_MAX: u64 = 1024;
 

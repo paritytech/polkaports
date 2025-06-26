@@ -8,7 +8,7 @@ use crate::{
 use SyscallOutcome::*;
 
 pub struct KernelState<Fd> {
-	pub fds: BTreeMap<u64, Fd>,
+	pub fds: BTreeMap<u32, Fd>,
 }
 
 impl<Fd> KernelState<Fd> {
@@ -31,7 +31,7 @@ pub struct Kernel<C: Machine + Environment + FileSystem> {
 	pub state: KernelState<C::Fd>,
 	uid: u32,
 	gid: u32,
-	max_fd: Option<u64>,
+	max_fd: Option<u32>,
 }
 
 impl<C: Machine + Environment + FileSystem> Kernel<C> {
@@ -48,22 +48,22 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		let a5 = self.context.reg(Reg::A5);
 		match syscall {
 			SYS_READ => {
-				let result = self.handle_read(a1, a2, a3);
+				let result = self.handle_read(a1 as i64 as i32, a2, a3);
 				log::trace!("Syscall read(fd={a1}, address={a2:#x}, length={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_READV => {
-				let result = self.handle_readv(a1, a2, a3);
+				let result = self.handle_readv(a1 as i64 as i32, a2, a3);
 				log::trace!("Syscall readv(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_WRITE => {
-				let result = self.handle_write(a1, a2, a3);
+				let result = self.handle_write(a1 as i64 as i32, a2, a3);
 				log::trace!("Syscall write(fd={a1}, address={a2:#x}, length={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_WRITEV => {
-				let result = self.handle_writev(a1, a2, a3);
+				let result = self.handle_writev(a1 as i64 as i32, a2, a3);
 				log::trace!("Syscall writev(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
@@ -80,12 +80,12 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_LSEEK => {
-				let result = self.handle_lseek(a1, a2 as i64, a3);
+				let result = self.handle_lseek(a1 as i64 as i32, a2 as i64, a3);
 				log::trace!("Syscall lseek(fd={a1}, offset={a2}, whence={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_CLOSE => {
-				let result = self.handle_close(a1);
+				let result = self.handle_close(a1 as i64 as i32);
 				log::trace!("Syscall close(fd={a1}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
@@ -144,12 +144,12 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_FCNTL => {
-				let result = self.handle_fcntl(a1, a2, a3);
+				let result = self.handle_fcntl(a1 as i64 as i32, a2, a3);
 				log::debug!("Syscall fcntl(fd={a1}, op={a2}, {a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_GETDENTS64 => {
-				let result = self.handle_getdents64(a1, a2, a3);
+				let result = self.handle_getdents64(a1 as i64 as i32, a2, a3);
 				log::debug!("Syscall getdents64(fd={a1}, buf={a2:#x}, size={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
@@ -178,7 +178,7 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		Ok(Continue)
 	}
 
-	fn handle_open(&mut self, path: &CStr, flags: u64) -> Result<u64, Error> {
+	fn handle_open(&mut self, path: &CStr, flags: u64) -> Result<u32, Error> {
 		if (flags & (O_WRONLY | O_RDWR)) != 0 {
 			return Err(Error(EACCES));
 		}
@@ -193,7 +193,7 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		Ok(fd)
 	}
 
-	fn handle_openat(&mut self, dirfd: u64, path: u64, flags: u64) -> Result<u64, Error> {
+	fn handle_openat(&mut self, dirfd: u64, path: u64, flags: u64) -> Result<u32, Error> {
 		let path = self.context.read_cstring(path, PATH_MAX)?;
 		let dirfd = dirfd as i64 as i32;
 		let result = self.do_handle_openat(dirfd, &path, flags);
@@ -205,21 +205,23 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 	}
 
 	#[inline]
-	fn do_handle_openat(&mut self, dirfd: i32, path: &CStr, flags: u64) -> Result<u64, Error> {
+	fn do_handle_openat(&mut self, dirfd: i32, path: &CStr, flags: u64) -> Result<u32, Error> {
 		if dirfd != AT_FDCWD {
 			return Err(Error(ENOSYS));
 		}
 		self.handle_open(path, flags)
 	}
 
-	fn handle_close(&mut self, fd: u64) -> Result<(), Error> {
+	fn handle_close(&mut self, fd: i32) -> Result<(), Error> {
+		let fd = fd.try_into().map_err(|_| Error(EBADF))?;
 		if self.state.fds.remove(&fd).is_some() {
 			return Ok(());
 		}
 		Err(Error(EBADF))
 	}
 
-	fn handle_read(&mut self, fd: u64, address: u64, length: u64) -> Result<u64, Error> {
+	fn handle_read(&mut self, fd: i32, address: u64, length: u64) -> Result<u64, Error> {
+		let fd = fd.try_into().map_err(|_| Error(EBADF))?;
 		let fd = self.state.fds.get_mut(&fd).ok_or(Error(EBADF))?;
 		if address.checked_add(length).is_none() || u32::try_from(address + length).is_err() {
 			return Err(Error(EFAULT));
@@ -232,7 +234,7 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		Ok(num_bytes_read as u64)
 	}
 
-	fn handle_readv(&mut self, fd: u64, iov: u64, iovcnt: u64) -> Result<u64, Error> {
+	fn handle_readv(&mut self, fd: i32, iov: u64, iovcnt: u64) -> Result<u64, Error> {
 		if iovcnt == 0 || iovcnt > IOV_MAX {
 			return Err(Error(EINVAL));
 		}
@@ -248,7 +250,8 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		Ok(total_length)
 	}
 
-	fn handle_write(&mut self, fd: u64, address: u64, length: u64) -> Result<u64, Error> {
+	fn handle_write(&mut self, fd: i32, address: u64, length: u64) -> Result<u64, Error> {
+		let fd = fd.try_into().map_err(|_| Error(EBADF))?;
 		if fd != FILENO_STDOUT && fd != FILENO_STDERR && !self.state.fds.contains_key(&fd) {
 			return Err(Error(EBADF));
 		}
@@ -266,7 +269,7 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		}
 	}
 
-	fn handle_writev(&mut self, fd: u64, iov: u64, iovcnt: u64) -> Result<u64, Error> {
+	fn handle_writev(&mut self, fd: i32, iov: u64, iovcnt: u64) -> Result<u64, Error> {
 		if iovcnt == 0 || iovcnt > IOV_MAX {
 			return Err(Error(EINVAL));
 		}
@@ -282,7 +285,8 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		Ok(total_length)
 	}
 
-	fn handle_lseek(&mut self, fd: u64, offset: i64, whence: u64) -> Result<u64, Error> {
+	fn handle_lseek(&mut self, fd: i32, offset: i64, whence: u64) -> Result<u64, Error> {
+		let fd = fd.try_into().map_err(|_| Error(EBADF))?;
 		let fd = self.state.fds.get_mut(&fd).ok_or(Error(EBADF))?;
 		let from = match whence {
 			SEEK_SET => SeekFrom::Start(offset as u64),
@@ -313,7 +317,8 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		Err(Error(ENOSYS))
 	}
 
-	fn handle_fcntl(&mut self, fd: u64, op: u64, arg0: u64) -> Result<(), Error> {
+	fn handle_fcntl(&mut self, fd: i32, op: u64, arg0: u64) -> Result<(), Error> {
+		let fd = fd.try_into().map_err(|_| Error(EBADF))?;
 		if !self.state.fds.contains_key(&fd) {
 			return Err(Error(EBADF));
 		}
@@ -445,10 +450,11 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 
 	fn handle_getdents64(
 		&mut self,
-		fd: u64,
+		fd: i32,
 		buf_address: u64,
 		buf_size: u64,
 	) -> Result<u64, Error> {
+		let fd = fd.try_into().map_err(|_| Error(EBADF))?;
 		let fd = self.state.fds.get_mut(&fd).ok_or(Error(EBADF))?;
 		let buf_size = buf_size as usize;
 		let mut buf = vec![0_u8; buf_size];
@@ -526,4 +532,4 @@ pub enum SyscallOutcome {
 const THREAD_ID: u32 = 1;
 
 /// 0, 1, 2 are reserved.
-const MAX_RESERVED_FD: u64 = 2;
+const MAX_RESERVED_FD: u32 = 2;
