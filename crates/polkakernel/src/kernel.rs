@@ -378,8 +378,8 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 				env!("CARGO_PKG_VERSION")
 			)
 			.as_bytes()),
-			// Linux version. See `sdk/riscv64-include/linux/version.h`.
-			release: utsname_field!(b"6.1.4"),
+			// Linux version. See `sysroot-corevm/include/linux/version.h`.
+			release: utsname_field!(b"6.15.0"),
 			machine: utsname_field!(b"riscv64emac"),
 			domainname: [0_u8; 65],
 		};

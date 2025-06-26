@@ -27,6 +27,7 @@ main() {
 		-e 's/.*\bCONFIG_STATIC\b.*/CONFIG_STATIC=y/g' \
 		-e 's/.*\bCONFIG_SHA1_HWACCEL\b.*/CONFIG_SHA1_HWACCEL=n/g' \
 		-e 's/.*\bCONFIG_SHA256_HWACCEL\b.*/CONFIG_SHA256_HWACCEL=n/g' \
+		-e 's/.*\bCONFIG_TC\b.*/CONFIG_TC=n/g' \
 		.config
 	# Override tools.
 	sed -i \

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+linux_tag=v6.15
+linux_url=https://github.com/torvalds/linux
+
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
 AR="${AR:-llvm-ar}"
@@ -61,14 +64,12 @@ musl_build() {
 }
 
 musl_install() {
-	# Install RISCV Linux headers.
-	cp -r "$root"/sdk/riscv64-include/* "$sysroot"/include/
 	# Install CoreVM-specific headers.
 	case "$suffix" in
 	polkavm) ;;
 	corevm) ln -f "$root"/sdk/corevm_guest.h "$sysroot"/include/ ;;
 	esac
-    cp "$root"/libs/musl/arch/riscv64/polkavm_guest.h "$sysroot"/include/
+	cp "$root"/libs/musl/arch/riscv64/polkavm_guest.h "$sysroot"/include/
 
 	mkdir -p "$sysroot"/lib
 	cp "$root"/libs/musl/lib/*.a "$sysroot"/lib
@@ -89,6 +90,15 @@ musl_install() {
 			"$root"/libs/musl/libclang_rt.builtins-riscv64.a \
 			"$sysroot"/lib/libclang_rt.builtins"$another_suffix".a
 	done
+}
+
+linux_install() {
+	if ! test -d "$workdir"/linux; then
+		git clone --depth=1 --branch="$linux_tag" "$linux_url" "$workdir"/linux
+	fi
+	cd "$workdir"/linux
+	run make headers_install ARCH=riscv CONFIG_ARCH_RV64I=y INSTALL_HDR_PATH="$sysroot"
+	cd "$root"
 }
 
 sysroot_init() {
@@ -144,6 +154,7 @@ main() {
 		esac
 		musl_build
 		musl_install
+		linux_install
 	done
 	cat <<'EOF'
 
