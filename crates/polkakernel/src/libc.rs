@@ -14,6 +14,7 @@ pub const EIO: u64 = 5;
 pub const ENOENT: u64 = 2;
 pub const ENOSYS: u64 = 38;
 pub const EISDIR: u64 = 21;
+pub const ERANGE: u64 = 34;
 
 pub const FILENO_STDERR: u32 = 2;
 pub const FILENO_STDOUT: u32 = 1;
@@ -62,6 +63,7 @@ pub const SYS_FACCESSAT: u64 = 48;
 pub const SYS_GETGROUPS: u64 = 158;
 pub const SYS_SYNC: u64 = 81;
 pub const SYS_DUP3: u64 = 24;
+pub const SYS_GETCWD: u64 = 17;
 
 pub const TIOCGWINSZ: u64 = 0x5413;
 

@@ -19,6 +19,7 @@ impl Error {
 			ENOSYS => "ENOSYS",
 			EISDIR => "EISDIR",
 			ENOTDIR => "ENOTDIR",
+			ERANGE => "RANGE",
 			_ => return None,
 		})
 	}

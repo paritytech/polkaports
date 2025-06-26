@@ -49,30 +49,30 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		match syscall {
 			SYS_READ => {
 				let result = self.handle_read(a1 as i64 as i32, a2, a3);
-				log::trace!("Syscall read(fd={a1}, address={a2:#x}, length={a3}) = {result:?}");
+				log::debug!("Syscall read(fd={a1}, address={a2:#x}, length={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_READV => {
 				let result = self.handle_readv(a1 as i64 as i32, a2, a3);
-				log::trace!("Syscall readv(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result:?}");
+				log::debug!("Syscall readv(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_WRITE => {
 				let result = self.handle_write(a1 as i64 as i32, a2, a3);
-				log::trace!("Syscall write(fd={a1}, address={a2:#x}, length={a3}) = {result:?}");
+				log::debug!("Syscall write(fd={a1}, address={a2:#x}, length={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_WRITEV => {
 				let result = self.handle_writev(a1 as i64 as i32, a2, a3);
-				log::trace!("Syscall writev(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result:?}");
+				log::debug!("Syscall writev(fd={a1}, iov={a2:#x}, iovcnt={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_EXIT => {
-				log::trace!("Syscall exit(status={a1})");
+				log::debug!("Syscall exit(status={a1})");
 				return Ok(Exit(a1 as u8));
 			},
 			SYS_EXIT_GROUP => {
-				log::trace!("Syscall exit_group(status={a1})");
+				log::debug!("Syscall exit_group(status={a1})");
 				return Ok(Exit(a1 as u8));
 			},
 			SYS_OPENAT => {
@@ -81,17 +81,17 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 			},
 			SYS_LSEEK => {
 				let result = self.handle_lseek(a1 as i64 as i32, a2 as i64, a3);
-				log::trace!("Syscall lseek(fd={a1}, offset={a2}, whence={a3}) = {result:?}");
+				log::debug!("Syscall lseek(fd={a1}, offset={a2}, whence={a3}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_CLOSE => {
 				let result = self.handle_close(a1 as i64 as i32);
-				log::trace!("Syscall close(fd={a1}) = {result:?}");
+				log::debug!("Syscall close(fd={a1}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_SET_TID_ADDRESS => {
 				let result = self.handle_set_tid_address(a1);
-				log::trace!("Syscall set_tid_address(tid_ptr={a1:#x}) = {result:?}");
+				log::debug!("Syscall set_tid_address(tid_ptr={a1:#x}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_IOCTL => {
@@ -167,6 +167,11 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 				log::debug!("Syscall sync() = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
+			SYS_GETCWD => {
+				let result = self.handle_getcwd(a1, a2);
+				log::debug!("Syscall getcwd(buf={a1:#x}, size={a2}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
 			_ => {
 				log::debug!(
 					"Unimplemented syscall: {syscall:>3}, \
@@ -197,7 +202,7 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		let path = self.context.read_cstring(path, PATH_MAX)?;
 		let dirfd = dirfd as i64 as i32;
 		let result = self.do_handle_openat(dirfd, &path, flags);
-		log::trace!(
+		log::debug!(
 			"Syscall openat(dirfd={}, path={path:?}, flags={flags:#o}) = {result:?}",
 			DebugDirFd(dirfd)
 		);
@@ -434,7 +439,6 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 			st_size: meta.size as OffT,
 			..Default::default()
 		};
-		log::debug!("{stat:?}");
 		self.context.write_memory(stat_address, as_u8_slice(&stat))?;
 		Ok(())
 	}
@@ -504,6 +508,15 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 			return Ok(())
 		}
 		Err(Error(EACCES))
+	}
+
+	fn handle_getcwd(&mut self, buf_address: u64, buf_size: u64) -> Result<u64, Error> {
+		if buf_size < 1 {
+			return Err(Error(ERANGE));
+		}
+		let cwd = c"/".to_bytes_with_nul();
+		self.context.write_memory(buf_address, cwd)?;
+		Ok(cwd.len() as u64)
 	}
 }
 
