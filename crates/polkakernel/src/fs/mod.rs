@@ -13,13 +13,22 @@ use core::ffi::CStr;
 
 use crate::Error;
 
-// TODO @ivan Support proper file trees.
 pub trait FileSystem {
 	type Fd: Sized;
 
-	fn open_file(&mut self, path: &CStr) -> Result<Self::Fd, Error>;
+	fn open(&mut self, path: &CStr, flags: u64) -> Result<Self::Fd, Error>;
 	fn seek(&mut self, fd: &mut Self::Fd, from: SeekFrom) -> Result<u64, Error>;
-	fn read(&mut self, fd: &mut Self::Fd, buf: &mut [u8]) -> Result<u64, Error>;
+	fn read(&mut self, fd: &mut Self::Fd, buf: &mut [u8]) -> Result<usize, Error>;
+	fn read_dir(&mut self, fd: &mut Self::Fd, buf: &mut [u8]) -> Result<usize, Error>;
+	fn metadata(&mut self, path: &CStr) -> Result<Metadata, Error>;
+}
+
+#[derive(Debug, Clone)]
+pub struct Metadata {
+	pub id: u64,
+	pub size: u64,
+	pub mode: u32,
+	pub block_size: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,6 +36,30 @@ pub enum SeekFrom {
 	Start(u64),
 	End(i64),
 	Current(i64),
+}
+
+pub const fn dir_entry_len(name_len: usize) -> usize {
+	let real_len = 8 + 8 + 2 + 1 + name_len;
+	// Align to 8-byte boundary.
+	real_len.next_multiple_of(8)
+}
+
+pub fn write_dir_entry(id: u64, name: &CStr, buf: &mut [u8]) -> usize {
+	let name_bytes = name.to_bytes_with_nul();
+	let name_len = name_bytes.len();
+	let Ok(entry_len) = u16::try_from(dir_entry_len(name_len)) else {
+		return 0;
+	};
+	let off = 0_u64;
+	let d_type = 0_u8;
+	buf[0..8].copy_from_slice(id.to_le_bytes().as_slice());
+	buf[8..16].copy_from_slice(off.to_le_bytes().as_slice());
+	buf[16..18].copy_from_slice(entry_len.to_le_bytes().as_slice());
+	buf[18] = d_type;
+	let n = 19 + name_len;
+	buf[19..n].copy_from_slice(name_bytes);
+	assert!(n <= entry_len as usize);
+	entry_len.into()
 }
 
 pub fn normalize_path(path: &CStr) -> CString {
