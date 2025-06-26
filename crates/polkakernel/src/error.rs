@@ -1,6 +1,6 @@
 use crate::libc::*;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Error(pub u64);
 
 impl Error {
@@ -17,6 +17,9 @@ impl Error {
 			EIO => "EIO",
 			ENOENT => "ENOENT",
 			ENOSYS => "ENOSYS",
+			EISDIR => "EISDIR",
+			ENOTDIR => "ENOTDIR",
+			ERANGE => "RANGE",
 			_ => return None,
 		})
 	}
@@ -27,6 +30,15 @@ impl core::fmt::Display for Error {
 		match self.as_str() {
 			Some(s) => f.write_str(s),
 			None => write!(f, "{}", self.0),
+		}
+	}
+}
+
+impl core::fmt::Debug for Error {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+		match self.as_str() {
+			Some(s) => write!(f, "Error({s})"),
+			None => f.debug_tuple("Error").field(&self.0).finish(),
 		}
 	}
 }
@@ -54,6 +66,24 @@ impl IntoSyscallRet for Result<u64, Error> {
 	fn into_ret(self) -> u64 {
 		match self {
 			Ok(ret) => ret,
+			Err(e) => e.code(),
+		}
+	}
+}
+
+impl IntoSyscallRet for Result<u32, Error> {
+	fn into_ret(self) -> u64 {
+		match self {
+			Ok(ret) => u64::from(ret),
+			Err(e) => e.code(),
+		}
+	}
+}
+
+impl IntoSyscallRet for Result<(), Error> {
+	fn into_ret(self) -> u64 {
+		match self {
+			Ok(()) => 0,
 			Err(e) => e.code(),
 		}
 	}

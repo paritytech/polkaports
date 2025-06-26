@@ -1,19 +1,22 @@
 #!/bin/bash
 
+linux_tag=v6.15
+linux_url=https://github.com/torvalds/linux
+
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
 AR="${AR:-llvm-ar}"
 RANLIB="${RANLIB:-llvm-ranlib}"
 
 run() {
-    set +e
-    "$@" >"$workdir"/output 2>&1
-    ret="$?"
-    set +e
-    if test "$ret" != 0; then
-        cat "$workdir"/output >&2
-        return 1
-    fi
+	set +e
+	"$@" >"$workdir"/output 2>&1
+	ret="$?"
+	set -e
+	if test "$ret" != 0; then
+		cat "$workdir"/output >&2
+		return 1
+	fi
 }
 
 cleanup() {
@@ -61,17 +64,12 @@ musl_build() {
 }
 
 musl_install() {
-	mkdir -p "$sysroot"/include
-	cp -r "$root"/libs/musl/include/* "$sysroot"/include
-	cp -r "$root"/libs/musl/arch/generic/* "$sysroot"/include
-	cp -r "$root"/libs/musl/arch/riscv64/* "$sysroot"/include
-	cp -r "$root"/libs/musl/obj/include/* "$sysroot"/include
-
 	# Install CoreVM-specific headers.
 	case "$suffix" in
 	polkavm) ;;
 	corevm) ln -f "$root"/sdk/corevm_guest.h "$sysroot"/include/ ;;
 	esac
+	cp "$root"/libs/musl/arch/riscv64/polkavm_guest.h "$sysroot"/include/
 
 	mkdir -p "$sysroot"/lib
 	cp "$root"/libs/musl/lib/*.a "$sysroot"/lib
@@ -94,25 +92,50 @@ musl_install() {
 	done
 }
 
+linux_install() {
+	if ! test -d "$workdir"/linux; then
+		git clone --depth=1 --branch="$linux_tag" "$linux_url" "$workdir"/linux
+	fi
+	cd "$workdir"/linux
+	run make headers_install ARCH=riscv CONFIG_ARCH_RV64I=y INSTALL_HDR_PATH="$sysroot"
+	cd "$root"
+}
+
 sysroot_init() {
 	rm -rf "$sysroot"/bin
 	mkdir -p "$sysroot"/bin
 	cat >"$sysroot"/bin/polkavm-cc <<EOF
 #!/bin/sh
-exec "$CC" --config=$sysroot/clang.cfg "\$@"
+suffix=
+for x in "\$@"; do
+	case "\$x" in
+	-nostdlib) suffix=-nostdlib ;;
+	*) ;;
+	esac
+done
+exec "$CC" --config=$sysroot/clang\$suffix.cfg "\$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-cc
 	cat >"$sysroot"/bin/polkavm-c++ <<EOF
 #!/bin/sh
-exec "$CXX" --config=$sysroot/clang.cfg "\$@"
+suffix=
+for x in "\$@"; do
+	case "\$x" in
+	-nostdlib) suffix=-nostdlib ;;
+	*) ;;
+	esac
+done
+exec "$CXX" --config=$sysroot/clang\$suffix.cfg "\$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
 	ln -f "$root"/sdk/clang.cfg "$sysroot"/
-	# clang-18 and clang-19 on Ubuntu wants libgcc
+	ln -f "$root"/sdk/clang-nostdlib.cfg "$sysroot"/
+	# clang-18 and clang-19 on Ubuntu want libgcc
 	# clang-20 on Fedora wants libgcc_s
+	# busybox wants libgcc_eh
 	mkdir -p "$sysroot"/lib
-	for name in libgcc_s libgcc; do
-		 touch "$sysroot"/lib/"$name".a
+	for name in libgcc_s libgcc libgcc_eh; do
+		touch "$sysroot"/lib/"$name".a
 	done
 }
 
@@ -120,6 +143,7 @@ main() {
 	PS4='$0:$LINENO: 🏗️  ' set -ex
 	root="$PWD"
 	workdir="$(mktemp -d)"
+	trap cleanup EXIT
 	for suffix in polkavm corevm; do
 		sysroot="$root"/sysroot-"$suffix"
 		sysroot_init
@@ -130,6 +154,7 @@ main() {
 		esac
 		musl_build
 		musl_install
+		linux_install
 	done
 	cat <<'EOF'
 
