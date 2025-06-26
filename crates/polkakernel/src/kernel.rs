@@ -511,10 +511,10 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 	}
 
 	fn handle_getcwd(&mut self, buf_address: u64, buf_size: u64) -> Result<u64, Error> {
-		if buf_size < 1 {
+		let cwd = c"/".to_bytes_with_nul();
+		if buf_size < cwd.len() as u64 {
 			return Err(Error(ERANGE));
 		}
-		let cwd = c"/".to_bytes_with_nul();
 		self.context.write_memory(buf_address, cwd)?;
 		Ok(cwd.len() as u64)
 	}
