@@ -2,6 +2,8 @@
 
 linux_tag=v6.15
 linux_url=https://github.com/torvalds/linux
+libunwind_tag=v1.8.2
+libunwind_url=https://github.com/libunwind/libunwind
 
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
@@ -95,7 +97,7 @@ musl_install() {
 
 libunwind_install() {
 	rm -rf "$workdir"/libunwind
-	git clone --depth=1 --branch=v1.8.2 --quiet https://github.com/libunwind/libunwind "$workdir"/libunwind
+	git clone --depth=1 --branch="$libunwind_tag" --quiet "$libunwind_url" "$workdir"/libunwind
 	cp "$root"/sdk/stdatomic.h "$sysroot"/include
 	cd "$workdir"/libunwind
 	autoreconf -vif
