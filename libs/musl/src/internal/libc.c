@@ -1,6 +1,8 @@
 #include "libc.h"
 
-struct __libc __libc;
+struct __libc __libc = {
+    .page_size = 4096,
+};
 
 size_t __hwcap;
 char *__progname=0, *__progname_full=0;

@@ -2,7 +2,8 @@ use alloc::{collections::BTreeMap, vec};
 use core::{ffi::CStr, mem::size_of};
 
 use crate::{
-	libc::*, Environment, Error, FileSystem, IntoSyscallRet, Machine, MachineError, Reg, SeekFrom,
+	debug, libc::*, Environment, Error, FileSystem, IntoSyscallRet, Machine, MachineError, Reg,
+	SeekFrom,
 };
 
 use SyscallOutcome::*;
@@ -74,6 +75,20 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 			SYS_EXIT_GROUP => {
 				log::debug!("Syscall exit_group(status={a1})");
 				return Ok(Exit(a1 as u8));
+			},
+			SYS_TKILL => {
+				if a1 == 0 && a2 != 0 {
+					// Abort the program.
+					log::debug!(
+						"Syscall tkill(pid={a1}, signal={}) = Ok(Exit({}))",
+						debug::Signal(a2 as u8),
+						a2 as u8
+					);
+					return Ok(Exit(a2 as u8));
+				}
+				let result = self.handle_tkill(a1, a2);
+				log::debug!("Syscall tkill(pid={a1}, signal={})", debug::Signal(a2 as u8));
+				self.context.set_reg(Reg::A0, result.into_ret());
 			},
 			SYS_OPENAT => {
 				let result = self.handle_openat(a1, a2, a3);
@@ -172,6 +187,24 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 				log::debug!("Syscall getcwd(buf={a1:#x}, size={a2}) = {result:?}");
 				self.context.set_reg(Reg::A0, result.into_ret());
 			},
+			SYS_PPOLL => {
+				let result = self.handle_ppoll(a1, a2, a3, a4);
+				log::debug!("Syscall ppoll(fds={a1:#x}, nfds={a2}, timeout={a3:#x}, sigmask={a4:#x}) = {result:?}");
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_RT_SIGACTION => {
+				let result = self.handle_rt_sigaction(a1, a2, a3, a4);
+				log::debug!("Syscall rt_sigaction(signal={}, action={a2:#x}, old_action={a3:#x}, sigset_size={a4}) = {result:?}", debug::Signal(a1 as u8));
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
+			SYS_RT_SIGPROCMASK => {
+				let result = self.handle_rt_sigprocmask(a1, a2, a3, a4);
+				log::debug!(
+                    "Syscall rt_sigprocmask(how={}, set={a2:#x}, old_set={a3:#x}, sigset_size={a4}) = {result:?}",
+                    debug::SigMask(a1 as u8)
+				);
+				self.context.set_reg(Reg::A0, result.into_ret());
+			},
 			_ => {
 				log::debug!(
 					"Unimplemented syscall: {syscall:>3}, \
@@ -204,7 +237,7 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		let result = self.do_handle_openat(dirfd, &path, flags);
 		log::debug!(
 			"Syscall openat(dirfd={}, path={path:?}, flags={flags:#o}) = {result:?}",
-			DebugDirFd(dirfd)
+			debug::DirFd(dirfd)
 		);
 		result
 	}
@@ -409,7 +442,7 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		let result = self.do_handle_newfstatat(dirfd, &path, stat_address, flags);
 		log::debug!(
 			"Syscall newfstatat(dirfd={}, path={path:?}, stat={stat_address:#x}, flags={flags:#x}) = {result:?}",
-			DebugDirFd(dirfd)
+			debug::DirFd(dirfd)
 		);
 		result
 	}
@@ -487,7 +520,7 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		let result = self.do_handle_faccessat(dirfd, &path, mode, flags);
 		log::debug!(
 			"Syscall faccessat(dirfd={}, path={path:?}, mode={mode:#o}, flags={flags:#x}) = {result:?}",
-            DebugDirFd(dirfd)
+            debug::DirFd(dirfd)
 		);
 		result
 	}
@@ -518,22 +551,47 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 		self.context.write_memory(buf_address, cwd)?;
 		Ok(cwd.len() as u64)
 	}
+
+	fn handle_tkill(&mut self, pid: u64, _sig: u64) -> Result<(), Error> {
+		if pid != 0 {
+			return Err(Error(ENOSYS));
+		}
+		Ok(())
+	}
+
+	fn handle_ppoll(
+		&mut self,
+		_fds: u64,
+		_nfds: u64,
+		_timeout: u64,
+		_sigmask: u64,
+	) -> Result<u64, Error> {
+		Ok(0)
+	}
+
+	fn handle_rt_sigaction(
+		&mut self,
+		_signum: u64,
+		_action: u64,
+		_old_action: u64,
+		_sigset_size: u64,
+	) -> Result<(), Error> {
+		Ok(())
+	}
+
+	fn handle_rt_sigprocmask(
+		&mut self,
+		_signum: u64,
+		_action: u64,
+		_old_action: u64,
+		_sigset_size: u64,
+	) -> Result<(), Error> {
+		Ok(())
+	}
 }
 
 fn as_u8_slice<T>(value: &T) -> &[u8] {
 	unsafe { core::slice::from_raw_parts(core::ptr::from_ref(value).cast::<u8>(), size_of::<T>()) }
-}
-
-struct DebugDirFd(i32);
-
-impl core::fmt::Display for DebugDirFd {
-	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-		if self.0 == AT_FDCWD {
-			f.write_str("AT_FDCWD")
-		} else {
-			write!(f, "{}", self.0)
-		}
-	}
 }
 
 #[derive(Debug)]

@@ -190,11 +190,30 @@ EOF
 	done
 }
 
+run_single() {
+	case "$1" in
+	musl)
+		suffix=corevm
+		sysroot="$root"/sysroot-"$suffix"
+		musl_build
+		musl_install
+		;;
+	*)
+		printf "Uknown subcommand: '%s'\n" "$1"
+		return 1
+		;;
+	esac
+}
+
 main() {
 	PS4='$0:$LINENO: 🏗️  ' set -ex
 	root="$PWD"
 	workdir="$(mktemp -d)"
 	trap cleanup EXIT
+	if test -n ${1+x}; then
+		run_single "$1"
+		exit 0
+	fi
 	for suffix in polkavm corevm; do
 		sysroot="$root"/sysroot-"$suffix"
 		sysroot_init
@@ -220,4 +239,4 @@ Type one of the following commands to activate the toolchain.
 EOF
 }
 
-main
+main "$@"

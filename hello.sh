@@ -8,13 +8,12 @@ toolchain=nightly-2024-11-01
 suffix=corevm
 target_name=riscv64emac-"$POLKAPORTS_SUFFIX"-linux-musl
 export RUSTC_BOOTSTRAP=1
-rm -rf target/riscv64emac-corevm-linux-musl/release
+rm -rf target/riscv64emac-corevm-linux-musl
 cargo +"$toolchain" \
 	build \
 	--quiet \
 	--package hello \
 	--target="$POLKAPORTS_SYSROOT"/"$target_name".json \
-	--release \
 	-Zbuild-std=core,alloc,std,panic_abort \
 	-Zbuild-std-features=panic_immediate_abort
-polkatool link --strip target/"$target_name"/release/hello -o hello
+polkatool link --min-stack-size 8388608 target/"$target_name"/debug/hello -o hello.corevm

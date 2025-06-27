@@ -23,7 +23,8 @@
       "--unique",
       "--apply-dynamic-relocs",
       "--no-allow-shlib-undefined",
-      "-Bsymbolic"
+      "-Bsymbolic",
+      "-lclang_rt.builtins-riscv64"
     ]
   },
   "os": "linux",
