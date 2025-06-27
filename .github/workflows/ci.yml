@@ -39,6 +39,7 @@ jobs:
       ENV: >
         CC=clang-19
         LD=clang-19
+        LLD=lld-19
         AR=llvm-ar-19
         AS=llvm-as-19
         NM=llvm-nm-19
@@ -65,6 +66,13 @@ jobs:
     name: Run setup script on MacOS
     timeout-minutes: 20
     runs-on: macos-14
+    env:
+      ENV: >
+        CC=clang
+        LD=clang
+        LLD=lld
+        AR=llvm-ar
+        RANLIB=llvm-ranlib
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,7 +82,7 @@ jobs:
       - name: Install rust-src
         run: rustup component add rust-src
       - name: Check that setup script works
-        run: env CC=clang LD=clang AR=llvm-ar RANLIB=llvm-ranlib ./ci/setup.sh
+        run: env $ENV ./ci/setup.sh
       - name: Check that our tools work (CoreVM)
         run: ./ci/apps.sh corevm
       - name: Check that our tools work (PolkaVM)

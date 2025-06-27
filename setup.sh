@@ -7,7 +7,7 @@ libunwind_url=https://github.com/libunwind/libunwind
 
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
-LD="${LD:-lld}"
+LLD="${LLD:-lld}"
 AR="${AR:-llvm-ar}"
 RANLIB="${RANLIB:-llvm-ranlib}"
 
@@ -118,7 +118,7 @@ libunwind_install() {
 		sed -i -e "/.*LOAD a$i,.*/d" src/riscv/setcontext.S
 	done
 	run env CC="$sysroot"/bin/polkavm-cc \
-		LD="$sysroot"/bin/polkavm-cc \
+		LLD="$sysroot"/bin/polkavm-cc \
 		CPPFLAGS="-D__linux__" \
 		./configure \
 		--prefix="$sysroot" \
