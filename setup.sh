@@ -172,7 +172,7 @@ EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
 	cat >"$sysroot"/bin/polkavm-lld <<EOF
 #!/bin/sh
-exec "$LD" "\$@" --sysroot="$sysroot" -L$sysroot/lib \
+exec "$LLD" "\$@" --sysroot="$sysroot" -L$sysroot/lib \
 	$sysroot/lib/Scrt1.o \
 	$sysroot/lib/crti.o \
 	$sysroot/lib/crtn.o
