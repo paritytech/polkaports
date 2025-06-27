@@ -212,7 +212,7 @@ main() {
 	root="$PWD"
 	workdir="$(mktemp -d)"
 	trap cleanup EXIT
-	if test -n ${1+x}; then
+	if ! test -z ${1+x}; then
 		run_single "$1"
 		exit 0
 	fi
