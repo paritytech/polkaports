@@ -56,7 +56,7 @@ jobs:
       - name: Install rust-src
         run: rustup component add rust-src
       - name: Check that setup script works
-        run: env $ENV ./ci/setup.sh
+        run: env $ENV ./setup.sh
       - name: Check that our tools work (CoreVM)
         run: env $ENV ./ci/apps.sh corevm
       - name: Check that our tools work (PolkaVM)
@@ -82,7 +82,7 @@ jobs:
       - name: Install rust-src
         run: rustup component add rust-src
       - name: Check that setup script works
-        run: env $ENV ./ci/setup.sh
+        run: env $ENV ./setup.sh
       - name: Check that our tools work (CoreVM)
         run: ./ci/apps.sh corevm
       - name: Check that our tools work (PolkaVM)
