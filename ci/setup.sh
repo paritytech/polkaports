@@ -1,6 +1,6 @@
 #!/bin/sh
 set -ex
-for tool in "$CC" "$LD" "$AR" "$RANLIB"; do
+for tool in "$CC" "$LLD" "$AR" "$RANLIB"; do
 	which "$tool"
 	"$tool" --version
 done

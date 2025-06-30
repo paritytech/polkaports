@@ -4,7 +4,7 @@ __asm__(
 ".global _pvm_start\n"
 ".type " START ",%function\n"
 "_pvm_start:\n"
-"andi sp, sp, -16\n"
+"andi sp, sp, -8\n"
 "tail " START "_c"
 );
 
