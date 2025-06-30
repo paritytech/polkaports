@@ -2,9 +2,12 @@
 
 linux_tag=v6.15
 linux_url=https://github.com/torvalds/linux
+libunwind_tag=v1.8.2
+libunwind_url=https://github.com/libunwind/libunwind
 
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
+LLD="${LLD:-lld}"
 AR="${AR:-llvm-ar}"
 RANLIB="${RANLIB:-llvm-ranlib}"
 
@@ -92,6 +95,45 @@ musl_install() {
 	done
 }
 
+libunwind_install() {
+	rm -rf "$workdir"/libunwind
+	git clone --depth=1 --branch="$libunwind_tag" --quiet "$libunwind_url" "$workdir"/libunwind
+	cp "$root"/sdk/stdatomic.h "$sysroot"/include
+	cd "$workdir"/libunwind
+	autoreconf -vif
+	# Disable floating point registers.
+	sed -i -e '/.*error.*Unsupported RISC-V floating-point length.*/d' src/riscv/asm.h
+	sed -i -e 's/.*error.*Unsupported RISC-V floating-point size.*/typedef struct {} unw_tdep_fpreg_t;/' include/libunwind-riscv.h
+	sed -i -e 's/.*error.*FIXME.*/return 0;/' include/tdep-riscv/libunwind_i.h
+	sed -i -e '/.*fpval.*=.*/d' src/riscv/Ginit.c
+	sed -i -e 's/.*error.*Unsupported RISC-V floating point ABI.*/#define JB_MASK_SAVED (208>>3)\n#define JB_MASK (216>>3)/' include/tdep-riscv/jmpbuf.h
+	# Disable s2-s11 registers.
+	for i in 2 3 4 5 6 7 8 9 10 11; do
+		sed -i -e "/.*STORE s$i,.*/d" src/riscv/getcontext.S
+		sed -i -e "/.*LOAD s$i,.*/d" src/riscv/setcontext.S
+	done
+	# Disable a6-a7 registers.
+	for i in 6 7; do
+		sed -i -e "/.*STORE a$i,.*/d" src/riscv/getcontext.S
+		sed -i -e "/.*LOAD a$i,.*/d" src/riscv/setcontext.S
+	done
+	run env CC="$sysroot"/bin/polkavm-cc \
+		LLD="$sysroot"/bin/polkavm-cc \
+		CPPFLAGS="-D__linux__" \
+		./configure \
+		--prefix="$sysroot" \
+		--disable-shared \
+		--disable-tests \
+		--disable-coredump \
+		--disable-ptrace \
+		--disable-nto \
+		--disable-setjmp \
+		--host riscv64-pc-linux-musl
+	run make -j
+	run make install
+	cd "$root"
+}
+
 linux_install() {
 	if ! test -d "$workdir"/linux; then
 		git clone --depth=1 --branch="$linux_tag" "$linux_url" "$workdir"/linux
@@ -128,8 +170,19 @@ done
 exec "$CXX" --config=$sysroot/clang\$suffix.cfg "\$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
+	cat >"$sysroot"/bin/polkavm-lld <<EOF
+#!/bin/sh
+exec "$LLD" "\$@" --sysroot="$sysroot" -L$sysroot/lib \
+	$sysroot/lib/Scrt1.o \
+	$sysroot/lib/crti.o \
+	$sysroot/lib/crtn.o
+EOF
+	chmod +x "$sysroot"/bin/polkavm-lld
 	ln -f "$root"/sdk/clang.cfg "$sysroot"/
 	ln -f "$root"/sdk/clang-nostdlib.cfg "$sysroot"/
+	sed -e "s|@VENDOR@|$suffix|g" \
+		<"$root"/sdk/riscv64emac-template-linux-musl.json \
+		>"$sysroot"/riscv64emac-"$suffix"-linux-musl.json
 	# clang-18 and clang-19 on Ubuntu want libgcc
 	# clang-20 on Fedora wants libgcc_s
 	# busybox wants libgcc_eh
@@ -139,11 +192,30 @@ EOF
 	done
 }
 
+run_single() {
+	case "$1" in
+	musl)
+		suffix=corevm
+		sysroot="$root"/sysroot-"$suffix"
+		musl_build
+		musl_install
+		;;
+	*)
+		printf "Uknown subcommand: '%s'\n" "$1"
+		return 1
+		;;
+	esac
+}
+
 main() {
 	PS4='$0:$LINENO: 🏗️  ' set -ex
 	root="$PWD"
 	workdir="$(mktemp -d)"
 	trap cleanup EXIT
+	if ! test -z ${1+x}; then
+		run_single "$1"
+		exit 0
+	fi
 	for suffix in polkavm corevm; do
 		sysroot="$root"/sysroot-"$suffix"
 		sysroot_init
@@ -155,6 +227,7 @@ main() {
 		musl_build
 		musl_install
 		linux_install
+		libunwind_install
 	done
 	cat <<'EOF'
 
@@ -168,4 +241,4 @@ Type one of the following commands to activate the toolchain.
 EOF
 }
 
-main
+main "$@"

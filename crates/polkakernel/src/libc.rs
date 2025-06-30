@@ -36,6 +36,43 @@ pub const F_SETFD: u64 = 2;
 
 pub const FD_CLOEXEC: u64 = 1;
 
+// Signals.
+pub const SIGHUP: u8 = 1;
+pub const SIGINT: u8 = 2;
+pub const SIGQUIT: u8 = 3;
+pub const SIGILL: u8 = 4;
+pub const SIGTRAP: u8 = 5;
+pub const SIGABRT: u8 = 6;
+pub const SIGBUS: u8 = 7;
+pub const SIGFPE: u8 = 8;
+pub const SIGKILL: u8 = 9;
+pub const SIGUSR1: u8 = 10;
+pub const SIGSEGV: u8 = 11;
+pub const SIGUSR2: u8 = 12;
+pub const SIGPIPE: u8 = 13;
+pub const SIGALRM: u8 = 14;
+pub const SIGTERM: u8 = 15;
+pub const SIGSTKFLT: u8 = 16;
+pub const SIGCHLD: u8 = 17;
+pub const SIGCONT: u8 = 18;
+pub const SIGSTOP: u8 = 19;
+pub const SIGTSTP: u8 = 20;
+pub const SIGTTIN: u8 = 21;
+pub const SIGTTOU: u8 = 22;
+pub const SIGURG: u8 = 23;
+pub const SIGXCPU: u8 = 24;
+pub const SIGXFSZ: u8 = 25;
+pub const SIGVTALRM: u8 = 26;
+pub const SIGPROF: u8 = 27;
+pub const SIGWINCH: u8 = 28;
+pub const SIGIO: u8 = 29;
+pub const SIGPWR: u8 = 30;
+pub const SIGSYS: u8 = 31;
+
+pub const SIG_BLOCK: u8 = 1;
+pub const SIG_UNBLOCK: u8 = 2;
+pub const SIG_SETMASK: u8 = 3;
+
 // See `arch/riscv64/bits/syscall.h.in` for the actual values.
 pub const SYS_FCNTL: u64 = 25;
 pub const SYS_CLOSE: u64 = 57;
@@ -64,6 +101,11 @@ pub const SYS_GETGROUPS: u64 = 158;
 pub const SYS_SYNC: u64 = 81;
 pub const SYS_DUP3: u64 = 24;
 pub const SYS_GETCWD: u64 = 17;
+pub const SYS_TKILL: u64 = 130;
+pub const SYS_PPOLL: u64 = 73;
+pub const SYS_RT_SIGACTION: u64 = 134;
+pub const SYS_RT_SIGPROCMASK: u64 = 135;
+pub const SYS_FUTEX: u64 = 98;
 
 pub const TIOCGWINSZ: u64 = 0x5413;
 
