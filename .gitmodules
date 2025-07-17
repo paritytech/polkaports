@@ -1,4 +1,0 @@
-[submodule "libs/picoalloc"]
-	path = libs/picoalloc
-	url = https://github.com/koute/picoalloc.git
-    tag = v1.1.0

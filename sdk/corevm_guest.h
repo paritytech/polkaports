@@ -41,8 +41,8 @@ inline static void corevm_free(const void* ptr, size_t size) {
 }
 
 enum CoreVmConsoleStream {
-    STDOUT = 1,
-    STDERR = 2
+    COREVM_STDOUT = 1,
+    COREVM_STDERR = 2
 };
 
 inline static void corevm_yield_console_data(enum CoreVmConsoleStream stream, const void* data, size_t size) {

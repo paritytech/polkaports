@@ -4,6 +4,8 @@ linux_tag=v6.15
 linux_url=https://github.com/torvalds/linux
 libunwind_tag=v1.8.2
 libunwind_url=https://github.com/libunwind/libunwind
+picoalloc_tag=v5.2.0
+picoalloc_url=https://github.com/koute/picoalloc
 
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
@@ -33,7 +35,10 @@ polkatool_install() {
 picoalloc_build() {
 	suffix="$1"
 	shift
-	cd "$root"/libs/picoalloc
+	if ! test -d "$workdir"/picoalloc; then
+		git clone --depth=1 --branch="$picoalloc_tag" --quiet "$picoalloc_url" "$workdir"/picoalloc
+	fi
+	cd "$workdir"/picoalloc
 	rm -rf target
 	RUSTC_BOOTSTRAP=1 cargo build \
 		-Zbuild-std=core,alloc \
@@ -43,7 +48,7 @@ picoalloc_build() {
 		--target="$root"/sdk/riscv64emac-unknown-none-polkavm.json \
 		"$@"
 	mv -v target/riscv64emac-unknown-none-polkavm/release/libpicoalloc_native.a \
-		target/riscv64emac-unknown-none-polkavm/release/libpicoalloc_native"$suffix".a
+		libpicoalloc_native"$suffix".a
 }
 
 musl_build() {
@@ -82,7 +87,7 @@ musl_install() {
 	rm -rf "$workdir"/repack
 	mkdir -p "$workdir"/repack
 	cd "$workdir"/repack
-	"$AR" x "$root"/libs/picoalloc/target/riscv64emac-unknown-none-polkavm/release/libpicoalloc_native"$suffix".a
+	"$AR" x "$workdir"/picoalloc/libpicoalloc_native"$suffix".a
 	cp "$root"/libs/musl/lib/libc.a .
 	"$AR" r libc.a picoalloc*.o
 	# Overwrite libc.a in the sysroot
