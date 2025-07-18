@@ -16,6 +16,17 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  UBUNTU_ENV: >
+    CC=clang-19
+    LD=clang-19
+    LLD=lld-19
+    AR=llvm-ar-19
+    AS=llvm-as-19
+    NM=llvm-nm-19
+    STRIP=llvm-strip-19
+    OBJCOPY=llvm-objcopy-19
+    OBJDUMP=llvm-objdump-19
+    RANLIB=llvm-ranlib-19
 
 jobs:
   rust:
@@ -24,10 +35,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get -qq update && sudo apt-get -qq install -y clang-19 lld-19 llvm-19 autotools-dev
       - name: Install nightly
         run: rustup toolchain install --profile minimal --component rustfmt nightly
-      - name: Install rustfmt, clippy
-        run: rustup component add clippy
+      - name: Install rust-src, clippy
+        run: rustup component add clippy rust-src
       - name: Run fmt, clippy, tests
         run: ./ci/rust.sh
 
@@ -35,32 +48,18 @@ jobs:
     name: Run setup script on Linux
     timeout-minutes: 20
     runs-on: ubuntu-24.04
-    env:
-      ENV: >
-        CC=clang-19
-        LD=clang-19
-        LLD=lld-19
-        AR=llvm-ar-19
-        AS=llvm-as-19
-        NM=llvm-nm-19
-        STRIP=llvm-strip-19
-        OBJCOPY=llvm-objcopy-19
-        OBJDUMP=llvm-objdump-19
-        RANLIB=llvm-ranlib-19
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
       - name: Install dependencies
         run: sudo apt-get -qq update && sudo apt-get -qq install -y clang-19 lld-19 llvm-19 autotools-dev
       - name: Install rust-src
         run: rustup component add rust-src
       - name: Check that setup script works
-        run: env $ENV ./setup.sh
+        run: env $UBUNTU_ENV ./setup.sh
       - name: Check that our tools work (CoreVM)
-        run: env $ENV ./ci/apps.sh corevm
+        run: env $UBUNTU_ENV ./ci/apps.sh corevm
       - name: Check that our tools work (PolkaVM)
-        run: env $ENV ./ci/apps.sh polkavm
+        run: env $UBUNTU_ENV ./ci/apps.sh polkavm
 
   setup-macos:
     name: Run setup script on MacOS
@@ -68,8 +67,6 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
       - name: Install dependencies
         run: ./ci/brew.sh
       - name: Install rust-src
