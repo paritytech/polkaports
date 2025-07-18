@@ -141,7 +141,7 @@ libunwind_install() {
 
 linux_install() {
 	if ! test -d "$workdir"/linux; then
-		git clone --depth=1 --branch="$linux_tag" "$linux_url" "$workdir"/linux
+		git clone --depth=1 --branch="$linux_tag" --quiet "$linux_url" "$workdir"/linux
 	fi
 	cd "$workdir"/linux
 	run make headers_install ARCH=riscv CONFIG_ARCH_RV64I=y INSTALL_HDR_PATH="$sysroot"

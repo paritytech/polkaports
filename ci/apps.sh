@@ -36,7 +36,7 @@ build_rust_apps() {
 			--target="$POLKAPORTS_SYSROOT"/"$rust_target".json \
 			-Zbuild-std=core,alloc,std,panic_abort \
 			-Zbuild-std-features=panic_immediate_abort
-		polkatool link --min-stack-size "$rust_stack_size" \
+		polkatool link --strip --min-stack-size "$rust_stack_size" \
 			target/"$rust_target"/debug/"$package" \
 			-o "$workdir"/"$package"."$suffix"
 	done
