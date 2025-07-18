@@ -67,7 +67,7 @@ fn build_musl() {
 		.current_dir(&build_dir)
 		.checked_status()
 		.unwrap();
-	build_picoalloc(workdir, &musl_dir);
+	build_picoalloc(workdir, &build_dir);
 	Command::new("make")
 		.with_job_server()
 		.arg("install")
@@ -77,7 +77,7 @@ fn build_musl() {
 	copy(&builtins_file, install_dir.join("lib").join(builtins_file.file_name().unwrap())).unwrap();
 }
 
-fn build_picoalloc(workdir: &Path, musl_dir: &Path) {
+fn build_picoalloc(workdir: &Path, musl_build_dir: &Path) {
 	let is_clippy = match var("RUSTC_WORKSPACE_WRAPPER") {
 		Ok(wrapper) => wrapper.ends_with("clippy-driver"),
 		Err(_) => false,
@@ -121,7 +121,7 @@ fn build_picoalloc(workdir: &Path, musl_dir: &Path) {
 		.checked_status()
 		.unwrap();
 	let ar = var_os("AR").unwrap_or_else(|| "llvm-ar".into());
-	let lib_dir = musl_dir.join("lib");
+	let lib_dir = musl_build_dir.join("lib");
 	Command::new(&ar)
 		.current_dir(&lib_dir)
 		.arg("x")
