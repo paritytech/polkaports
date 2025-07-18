@@ -42,7 +42,7 @@ jobs:
       - name: Install rust-src, clippy
         run: rustup component add clippy rust-src
       - name: Run fmt, clippy, tests
-        run: ./ci/rust.sh
+        run: env $UBUNTU_ENV ./ci/rust.sh
 
   setup-linux:
     name: Run setup script on Linux
