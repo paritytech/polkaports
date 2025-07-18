@@ -105,7 +105,7 @@ fn build_picoalloc(workdir: &Path, musl_dir: &Path) {
 		.args([
 			"build",
 			"-Zbuild-std=core,alloc",
-			"--quiet",
+			"--verbose",
 			"--package",
 			"picoalloc_native",
 			"--release",
