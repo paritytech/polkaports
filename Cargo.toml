@@ -9,6 +9,7 @@ version = "0.1.0"
 resolver = "2"
 members = [
     "crates/corevm-linker",
+    "crates/hello",
     "crates/polkakernel",
 ]
 default-members = ["crates/polkakernel"]
