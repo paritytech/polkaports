@@ -105,7 +105,7 @@ fn build_picoalloc(workdir: &Path, musl_dir: &Path) {
 		.args([
 			"build",
 			"-Zbuild-std=core,alloc",
-			"--verbose",
+			"--quiet",
 			"--package",
 			"picoalloc_native",
 			"--release",
@@ -114,6 +114,10 @@ fn build_picoalloc(workdir: &Path, musl_dir: &Path) {
 		])
 		.arg("--target")
 		.arg(polkavm_linker::target_json_64_path().unwrap())
+		.checked_status()
+		.unwrap();
+	Command::new("find")
+		.current_dir(build_dir.join("target"))
 		.checked_status()
 		.unwrap();
 	let ar = var_os("AR").unwrap_or_else(|| "llvm-ar".into());
