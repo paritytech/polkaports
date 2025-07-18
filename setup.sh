@@ -186,6 +186,7 @@ EOF
 	ln -f "$root"/sdk/clang.cfg "$sysroot"/
 	ln -f "$root"/sdk/clang-nostdlib.cfg "$sysroot"/
 	sed -e "s|@VENDOR@|$suffix|g" \
+        -e "s|@SYSROOT@|$sysroot|g" \
 		<"$root"/sdk/riscv64emac-template-linux-musl.json \
 		>"$sysroot"/riscv64emac-"$suffix"-linux-musl.json
 	# clang-18 and clang-19 on Ubuntu want libgcc

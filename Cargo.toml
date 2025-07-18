@@ -8,7 +8,7 @@ version = "0.1.0"
 [workspace]
 resolver = "2"
 members = [
-    "crates/hello",
+    "crates/corevm-linker",
     "crates/polkakernel",
 ]
 default-members = ["crates/polkakernel"]

@@ -1,9 +1,0 @@
-[package]
-name = "hello"
-authors.workspace = true
-edition.workspace = true
-repository.workspace = true
-license.workspace = true
-version.workspace = true
-
-[dependencies]

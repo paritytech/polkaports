@@ -1,0 +1,21 @@
+[package]
+name = "corevm-linker"
+description = "CoreVM linker"
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+dirs = "6.0.0"
+jam-codec = { version = "0.1.0", default-features = false, features = ["derive"] }
+log = "0.4.27"
+polkavm-linker = "0.26.0"
+
+[dev-dependencies]
+tempfile = "3.2.0"
+
+[build-dependencies]
+jobserver = "0.1.33"
+tempfile = "3.2.0"
