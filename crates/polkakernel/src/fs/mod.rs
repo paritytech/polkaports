@@ -44,22 +44,30 @@ pub const fn dir_entry_len(name_len: usize) -> usize {
 	real_len.next_multiple_of(8)
 }
 
-pub fn write_dir_entry(id: u64, name: &CStr, buf: &mut [u8]) -> usize {
+pub fn write_dir_entry(id: u64, name: &CStr, buf: &mut [u8]) -> Result<usize, WriteDirEntryErr> {
+	use WriteDirEntryErr::*;
 	let name_bytes = name.to_bytes_with_nul();
 	let name_len = name_bytes.len();
-	let Ok(entry_len) = u16::try_from(dir_entry_len(name_len)) else {
-		return 0;
-	};
+	let entry_len = dir_entry_len(name_len);
+	if entry_len > buf.len() {
+		return Err(BufferTooSmall);
+	}
+	let entry_len_u16: u16 = entry_len.try_into().map_err(|_| NameTooLong)?;
 	let off = 0_u64;
 	let d_type = 0_u8;
 	buf[0..8].copy_from_slice(id.to_le_bytes().as_slice());
 	buf[8..16].copy_from_slice(off.to_le_bytes().as_slice());
-	buf[16..18].copy_from_slice(entry_len.to_le_bytes().as_slice());
+	buf[16..18].copy_from_slice(entry_len_u16.to_le_bytes().as_slice());
 	buf[18] = d_type;
 	let n = 19 + name_len;
 	buf[19..n].copy_from_slice(name_bytes);
-	assert!(n <= entry_len as usize);
-	entry_len.into()
+	Ok(entry_len)
+}
+
+#[derive(Debug)]
+pub enum WriteDirEntryErr {
+	NameTooLong,
+	BufferTooSmall,
 }
 
 pub fn normalize_path(path: &CStr) -> CString {
