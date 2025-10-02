@@ -1,14 +1,21 @@
 use crate::libc::*;
 
+/// Syscall error.
+///
+/// See [errno(3)](https://man7.org/linux/man-pages/man3/errno.3.html).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Error(pub u64);
 
 impl Error {
+	/// Convert into return code of the syscall.
 	pub const fn code(self) -> u64 {
 		errno(self.0)
 	}
 
-	pub const fn as_str(self) -> Option<&'static str> {
+	/// Get error name.
+	///
+	/// Only some errors are covered by this function.
+	pub(crate) const fn as_str(self) -> Option<&'static str> {
 		Some(match self.0 {
 			EACCES => "EACCES",
 			EBADF => "EBADF",

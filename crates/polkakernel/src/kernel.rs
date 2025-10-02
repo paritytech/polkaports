@@ -8,6 +8,7 @@ use crate::{
 
 use SyscallOutcome::*;
 
+/// Serializable kernel state.
 pub struct KernelState<Fd> {
 	pub fds: BTreeMap<u32, Fd>,
 }
@@ -594,9 +595,12 @@ fn as_u8_slice<T>(value: &T) -> &[u8] {
 	unsafe { core::slice::from_raw_parts(core::ptr::from_ref(value).cast::<u8>(), size_of::<T>()) }
 }
 
+/// System call result.
 #[derive(Debug)]
 pub enum SyscallOutcome {
+	/// Continue process execution.
 	Continue,
+	/// Exit the process with the provided code.
 	Exit(u8),
 }
 

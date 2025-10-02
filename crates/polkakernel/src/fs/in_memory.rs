@@ -1,11 +1,17 @@
+//! In-memory [`FileSystem`].
+
 use alloc::{borrow::Cow, collections::BTreeMap, ffi::CString, sync::Arc};
 use core::ffi::CStr;
 
 use crate::{libc::*, normalize_path, Error, FileSystem, Metadata, SeekFrom};
 
+/// In-memory file contents.
 pub type FileBlob = Cow<'static, [u8]>;
+
+/// An implementation of [`FileSystem`] that uses memory to store files.
 pub type InMemoryFileSystem = BTreeMap<CString, Arc<FileBlob>>;
 
+/// In-memory-specific file system error.
 #[derive(Debug)]
 pub enum InMemoryError {
 	NotFound,

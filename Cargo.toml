@@ -1,7 +1,8 @@
 [workspace.package]
 authors = ["Parity Technologies <admin@parity.io>"]
 edition = "2021"
-repository = "https://github.com/paritytech/polkaports.git"
+homepage = "https://github.com/paritytech/polkaports"
+repository = "https://github.com/paritytech/polkaports"
 license = "Apache-2.0"
 version = "0.1.0"
 

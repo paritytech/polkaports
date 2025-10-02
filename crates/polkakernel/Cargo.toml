@@ -1,11 +1,17 @@
 [package]
 name = "polkakernel"
 description = "Linux syscall abstraction layer for PolkaVM/CoreVM"
+documentation = "https://docs.rs/polkakernel"
+readme = "README.md"
+keywords = ["polkavm", "corevm", "linux"]
+categories = ["virtualization", "emulators"]
+include = ["**/*.rs", "Cargo.toml", "README.md"]
 authors.workspace = true
 edition.workspace = true
 repository.workspace = true
 license.workspace = true
 version.workspace = true
+publish = true
 
 [features]
 default = []

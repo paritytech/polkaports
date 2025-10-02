@@ -5,7 +5,16 @@ use crate::libc::*;
 
 use MachineError::*;
 
+/// A machine, virtual or physical, in which user-space programs are running.
+///
+/// In PolkaVM/CoreVM case this is a virtual machine that runs guest code.
 pub trait Machine {
+	/// Prepare the machine for calling `main` function.
+	///
+	/// - Write arguments, environment variables and aux vector starting at `default_sp` address.
+	/// - Initialize SP register with the updated stack pointer.
+	/// - Initialize RA register with `default_ra` return address.
+	/// - Initialize A0 register with the address of `argc`.
 	fn init<'argv, 'envp, I1, I2>(
 		&mut self,
 		default_sp: u64,
@@ -66,12 +75,22 @@ pub trait Machine {
 		Ok(())
 	}
 
+	/// Get register value.
 	fn reg(&self, name: Reg) -> u64;
+
+	/// Set register value.
 	fn set_reg(&mut self, name: Reg, value: u64);
 
+	/// Read `u64` from the specified address.
 	fn read_u64(&mut self, address: u64) -> Result<u64, MachineError>;
+
+	/// Read `u32` from the specified address.
 	fn read_u32(&mut self, address: u64) -> Result<u32, MachineError>;
+
+	/// Read `u16` from the specified address.
 	fn read_u16(&mut self, address: u64) -> Result<u16, MachineError>;
+
+	/// Read `u8` from the specified address.
 	fn read_u8(&mut self, address: u64) -> Result<u8, MachineError>;
 
 	/// Read C-string from the provided address.
@@ -96,6 +115,7 @@ pub trait Machine {
 		Err(BadAddress)
 	}
 
+	/// Read memory from the specified address into the provided buffer.
 	fn read_memory_into(&mut self, address: u64, buffer: &mut [u8]) -> Result<(), MachineError>;
 
 	fn read_memory(&mut self, address: u64, length: u64) -> Result<Vec<u8>, MachineError> {
@@ -113,15 +133,26 @@ pub trait Machine {
 		Ok(buf)
 	}
 
+	/// Write `u64` at the specified address.
 	fn write_u64(&mut self, address: u64, value: u64) -> Result<(), MachineError>;
+
+	/// Write `u32` at the specified address.
 	fn write_u32(&mut self, address: u64, value: u32) -> Result<(), MachineError>;
+
+	/// Write `u16` at the specified address.
 	fn write_u16(&mut self, address: u64, value: u16) -> Result<(), MachineError>;
+
+	/// Write `u8` at the specified address.
 	fn write_u8(&mut self, address: u64, value: u8) -> Result<(), MachineError>;
+
+	/// Write slice at the specified address.
 	fn write_memory(&mut self, address: u64, slice: &[u8]) -> Result<(), MachineError>;
 }
 
+/// Machine-specific error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MachineError {
+	/// Memory access error.
 	BadAddress,
 }
 

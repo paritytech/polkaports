@@ -1,4 +1,6 @@
 //! Definitions from Musl libc.
+//!
+//! These come from Musl libc that was patched to forward all system calls to a PolkaVM host-call.
 
 #![allow(unused)]
 
