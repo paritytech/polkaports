@@ -1,5 +1,4 @@
-//! Linux syscall abstraction layer for PolkaVM/CoreVM.
-
+#![doc = include_str!("../README.md")]
 #![no_std]
 
 extern crate alloc;

@@ -1,10 +1,19 @@
 use crate::Error;
 
+/// Execution environment of a user-space program.
 pub trait Environment {
+	/// Write the provided data to the standard output stream.
+	///
+	/// Returns the number of bytes written.
 	fn write_to_stdout(&mut self, data: &[u8]) -> Result<u64, Error>;
+
+	/// Write the provided data to the standard error stream.
+	///
+	/// Returns the number of bytes written.
 	fn write_to_stderr(&mut self, data: &[u8]) -> Result<u64, Error>;
 }
 
+/// An [`Environment`] that uses Rust standard library for I/O.
 #[cfg(feature = "std")]
 pub struct StdEnv;
 

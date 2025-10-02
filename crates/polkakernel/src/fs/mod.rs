@@ -1,28 +1,49 @@
 #[cfg(feature = "std")]
-mod std_io;
+pub mod std_io;
 
-#[cfg(feature = "std")]
-pub use self::std_io::*;
-
-mod in_memory;
-
-pub use self::in_memory::*;
+pub mod in_memory;
 
 use alloc::{ffi::CString, vec::Vec};
 use core::ffi::CStr;
 
 use crate::Error;
 
+/// File system of a user-space program.
 pub trait FileSystem {
 	type Fd: Sized;
 
+	/// Open file under the provided path.
+	///
+	/// See [open(2)](https://man7.org/linux/man-pages/man2/open.2.html).
 	fn open(&mut self, path: &CStr, flags: u64) -> Result<Self::Fd, Error>;
+
+	/// Set the current read/write offset of the opened file.
+	///
+	/// See [lseek(2)](https://man7.org/linux/man-pages/man2/lseek.2.html).
 	fn seek(&mut self, fd: &mut Self::Fd, from: SeekFrom) -> Result<u64, Error>;
+
+	/// Read data from the opened file to the provided buffer.
+	///
+	/// Returns the number of bytes read.
+	///
+	/// See [read(2)](https://man7.org/linux/man-pages/man2/read.2.html).
 	fn read(&mut self, fd: &mut Self::Fd, buf: &mut [u8]) -> Result<usize, Error>;
+
+	/// Read directory contents into the provided buffer.
+	///
+	/// The implementation is expected to call [`write_dir_entry`] with `buf` as the last argument
+	/// for each entry in the directory.
+	///
+	/// See [readdir(2)](https://man7.org/linux/man-pages/man2/readdir.2.html).
 	fn read_dir(&mut self, fd: &mut Self::Fd, buf: &mut [u8]) -> Result<usize, Error>;
+
+	/// Read file metadata from the provided path.
 	fn metadata(&mut self, path: &CStr) -> Result<Metadata, Error>;
 }
 
+/// File system node metadata.
+///
+/// See [stat(3type)](https://man7.org/linux/man-pages/man3/stat.3type.html).
 #[derive(Debug, Clone)]
 pub struct Metadata {
 	pub id: u64,
@@ -31,19 +52,33 @@ pub struct Metadata {
 	pub block_size: u64,
 }
 
+/// File read/write position anchor.
+///
+/// See [lseek(2)](https://man7.org/linux/man-pages/man2/lseek.2.html).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SeekFrom {
+	/// Offset from the start of the file.
 	Start(u64),
+	/// Offset from the end of the file.
 	End(i64),
+	/// Offset from the current read/write position.
 	Current(i64),
 }
 
+/// Get directory entry length for the provided file name length.
+///
+/// See [getdents(2)](https://man7.org/linux/man-pages/man2/getdents.2.html).
 pub const fn dir_entry_len(name_len: usize) -> usize {
 	let real_len = 8 + 8 + 2 + 1 + name_len;
 	// Align to 8-byte boundary.
 	real_len.next_multiple_of(8)
 }
 
+/// Write directory entry for the specified file name to the provided buffer.
+///
+/// Meant to be used in the implementation of [`FileSystem::read_dir`].
+///
+/// See [getdents(2)](https://man7.org/linux/man-pages/man2/getdents.2.html).
 pub fn write_dir_entry(id: u64, name: &CStr, buf: &mut [u8]) -> Result<usize, WriteDirEntryErr> {
 	use WriteDirEntryErr::*;
 	let name_bytes = name.to_bytes_with_nul();
@@ -70,7 +105,7 @@ pub enum WriteDirEntryErr {
 	BufferTooSmall,
 }
 
-pub fn normalize_path(path: &CStr) -> CString {
+pub(crate) fn normalize_path(path: &CStr) -> CString {
 	let path = path.to_bytes();
 	let mut components = Vec::new();
 	for comp in path.split(|byte| *byte == b'/') {

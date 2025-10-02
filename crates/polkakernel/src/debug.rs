@@ -14,7 +14,7 @@ macro_rules! wrapper {
         pub struct $type(pub $underlying_type);
 
         impl $type {
-            pub fn as_str(&self) -> Option<&'static str> {
+            pub const fn as_str(&self) -> Option<&'static str> {
                 as_str! {
                     self.0,
                     $($predefined_values,)*

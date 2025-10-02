@@ -1,3 +1,5 @@
+//! A local [`FileSystem`].
+
 use core::ffi::CStr;
 use std::{
 	ffi::OsStr,
@@ -10,6 +12,7 @@ use std::{
 
 use crate::{Error, FileSystem, Metadata, SeekFrom};
 
+/// An implementation of [`FileSystem`] that uses local file system.
 pub struct StdFileSystem;
 
 impl FileSystem for StdFileSystem {
