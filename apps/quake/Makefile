@@ -74,8 +74,18 @@ QUAKE_OBJS = \
 
 all: $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX)
 
-$(OUTPUT)/quake.$(POLKAPORTS_SUFFIX): $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf
+$(OUTPUT)/quake.polkavm: $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf
 	polkatool link $< --output $@ --min-stack-size $(MIN_STACK_SIZE)
+
+$(OUTPUT)/quake.corevm: $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf
+	polkatool link $< --output $@.tmp --min-stack-size $(MIN_STACK_SIZE)
+	jam-blob set-meta \
+		--name PolkaQuake \
+		--version 0.1 \
+		--license GPLv2 \
+		--author 'Parity Technologies <admin@parity.io>' \
+		$@.tmp
+	mv $@.tmp $@
 
 $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf: $(QUAKE_OBJS)
 	$(CC) -v $(CFLAGS) $(LDFLAGS) -o $@ $+

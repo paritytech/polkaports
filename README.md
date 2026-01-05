@@ -29,3 +29,12 @@ env CC=clang CXX=clang++ LLD=lld ./setup.sh
 cd apps/quake
 make -j
 ```
+
+
+## How to run the application
+
+```bash
+jamt vm new quake.corevm 10000000000
+corevm-builder SERVICE_ID
+corevm-monitor SERVICE_ID
+```

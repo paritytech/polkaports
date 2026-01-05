@@ -32,6 +32,10 @@ polkatool_install() {
 	cargo install --quiet --root "$sysroot" polkatool
 }
 
+jam_program_blob_install() {
+	cargo install --quiet --root "$sysroot" jam-program-blob
+}
+
 picoalloc_build() {
 	suffix="$1"
 	shift
@@ -225,6 +229,7 @@ main() {
 		sysroot="$root"/sysroot-"$suffix"
 		sysroot_init
 		polkatool_install
+		jam_program_blob_install
 		case "$suffix" in
 		polkavm) picoalloc_build polkavm ;;
 		corevm) picoalloc_build corevm --features corevm ;;
