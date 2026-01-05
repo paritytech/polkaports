@@ -44,12 +44,13 @@ picoalloc_build() {
 	fi
 	cd "$workdir"/picoalloc
 	rm -rf target
+    target_json="$(polkatool get-target-json-path)"
 	RUSTC_BOOTSTRAP=1 cargo build \
 		-Zbuild-std=core,alloc \
 		--quiet \
 		--package picoalloc_native \
 		--release \
-		--target="$root"/sdk/riscv64emac-unknown-none-polkavm.json \
+		--target="$target_json" \
 		"$@"
 	mv -v target/riscv64emac-unknown-none-polkavm/release/libpicoalloc_native.a \
 		libpicoalloc_native"$suffix".a
