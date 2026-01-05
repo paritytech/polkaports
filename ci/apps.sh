@@ -44,7 +44,7 @@ build_rust_apps() {
 			jam-blob set-meta \
 				--name "$package" \
 				--version 0.1 \
-				--license MIT \
+				--license 'Apache-2.0' \
 				--author 'Parity Technologies <admin@parity.io>' \
 				target/"$rust_target"/debug/"$package"
 		fi
