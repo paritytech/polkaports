@@ -26,19 +26,28 @@ build_busybox() {
 build_rust_apps() {
 	rust_target=riscv64emac-"$suffix"-linux-musl
 	rust_stack_size=8388608
-    cd "$root"
-    rm -rf target/riscv64emac-corevm-linux-musl
-	for package in hello; do
+	cd "$root"
+	rm -rf target/riscv64emac-corevm-linux-musl
+	for dir in apps/rust/hello; do
+		cd "$root"/"$dir"
+		package="$(basename "$dir")"
 		run env RUSTC_BOOTSTRAP=1 \
 			cargo build \
 			--quiet \
-			--package "$package" \
 			--target="$POLKAPORTS_SYSROOT"/"$rust_target".json \
 			-Zbuild-std=core,alloc,std,panic_abort \
 			-Zbuild-std-features=panic_immediate_abort
 		polkatool link --min-stack-size "$rust_stack_size" \
 			target/"$rust_target"/debug/"$package" \
 			-o "$workdir"/"$package"."$suffix"
+		if test "$suffix" = "corevm"; then
+			jam-blob set-meta \
+				--name "$package" \
+				--version 0.1 \
+				--license MIT \
+				--author 'Parity Technologies <admin@parity.io>' \
+				target/"$rust_target"/debug/"$package"
+		fi
 	done
 }
 

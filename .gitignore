@@ -1,3 +1,4 @@
+/apps/rust/target
 /target
 /sysroot*
 *.o
