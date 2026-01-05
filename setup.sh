@@ -44,7 +44,7 @@ picoalloc_build() {
 	fi
 	cd "$workdir"/picoalloc
 	rm -rf target
-    target_json="$(polkatool get-target-json-path)"
+    target_json="$("$sysroot"/bin/polkatool get-target-json-path)"
 	RUSTC_BOOTSTRAP=1 cargo build \
 		-Zbuild-std=core,alloc \
 		--quiet \
