@@ -6,6 +6,7 @@ libunwind_tag=v1.8.2
 libunwind_url=https://github.com/libunwind/libunwind
 picoalloc_tag=v5.2.0
 picoalloc_url=https://github.com/koute/picoalloc
+polkatool_version=0.29.0
 
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
@@ -29,7 +30,7 @@ cleanup() {
 }
 
 polkatool_install() {
-	cargo install --quiet --root "$sysroot" polkatool
+	cargo install --quiet --root "$sysroot" polkatool@$polkatool_version
 }
 
 jam_program_blob_install() {
