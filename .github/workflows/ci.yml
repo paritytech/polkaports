@@ -38,6 +38,7 @@ jobs:
     env:
       ENV: >
         CC=clang-19
+        CXX=clang++-19
         LD=clang-19
         LLD=lld-19
         AR=llvm-ar-19
