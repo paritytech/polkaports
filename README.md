@@ -38,3 +38,14 @@ jamt vm new quake.corevm 10000000000
 corevm-builder SERVICE_ID
 corevm-monitor SERVICE_ID
 ```
+
+## Default polkaport Building for PVM build compatibility.
+
+`jam-pvm-builder` expect polkaports app to follow these rules:
+
+- POLKAPORT_OUTFILE: file name for output.
+- POLKAPORT_NAME: name in metadata, default value in `Makefile`.
+- POLKAPORT_VERSION: version in metadata, default value in `Makefile`.
+- POLKAPORT_LICENSE: license in metadata, default value in `Makefile`.
+- POLKAPORT_AUTHOR: author in metadata, default value in `Makefile`.
+- Release compile to `output/${POLKAPORT_OUTFILE}.core_vm` only by simply running `make -j`.

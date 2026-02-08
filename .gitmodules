@@ -1,3 +1,3 @@
 [submodule "apps/doom"]
 	path = apps/doom
-	url = git@github.com:koute/polkadoom.git
+	url = https://github.com/cheme/polkadoom.git
