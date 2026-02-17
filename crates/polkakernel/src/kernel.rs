@@ -290,6 +290,9 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 	}
 
 	fn handle_write(&mut self, fd: i32, address: u64, length: u64) -> Result<u64, Error> {
+		if length == 0 {
+			return Ok(0);
+		}
 		let fd = fd.try_into().map_err(|_| Error(EBADF))?;
 		if fd != FILENO_STDOUT && fd != FILENO_STDERR && !self.state.fds.contains_key(&fd) {
 			return Err(Error(EBADF));
