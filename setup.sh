@@ -223,12 +223,13 @@ libcxx_install() {
 	run env \
 		CC="$sysroot"/bin/polkavm-cc \
 		CXX="$sysroot"/bin/polkavm-c++ \
-		LD="$sysroot"/bin/polkavm-c++ \
 		CXXFLAGS="-I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3" \
 		LDFLAGS="-nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX="$sysroot" \
+        -DCMAKE_C_COMPILER_WORKS=1 \
+        -DCMAKE_CXX_COMPILER_WORKS=1 \
 		-DLIBCXX_ENABLE_STATIC=1 \
 		-DLIBCXX_ENABLE_SHARED=0 \
 		-DLIBCXX_ENABLE_EXCEPTIONS=0 \
@@ -252,13 +253,14 @@ libcxx_install() {
 	run env \
 		CC="$sysroot"/bin/polkavm-cc \
 		CXX="$sysroot"/bin/polkavm-c++ \
-		LD="$sysroot"/bin/polkavm-c++ \
 		CXXFLAGS="-I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3" \
 		LDFLAGS="-nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX="$sysroot" \
 		-DCMAKE_VERBOSE_MAKEFILE=1 \
+        -DCMAKE_C_COMPILER_WORKS=1 \
+        -DCMAKE_CXX_COMPILER_WORKS=1 \
 		-DLIBCXXABI_ENABLE_EXCEPTIONS=0 \
 		-DLIBCXXABI_USE_LLVM_UNWINDER=0 \
 		-DLIBCXXABI_ENABLE_STATIC_UNWINDER=1 \
