@@ -16,6 +16,9 @@ LLD="${LLD:-lld}"
 AR="${AR:-llvm-ar}"
 RANLIB="${RANLIB:-llvm-ranlib}"
 
+riscv_cflags="--target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -fpic -fPIE -mrelax"
+riscv_ldflags="-Wl,--emit-relocs -Wl,--no-relax"
+
 run() {
 	set +e
 	"$@" >"$workdir"/output 2>&1
@@ -63,12 +66,12 @@ musl_build() {
 	cd "$root"/libs/musl
 	mkdir -p src/malloc/mallocng
 	run env \
-		CFLAGS="-Wno-shift-op-parentheses -Wno-unused-command-line-argument -fpic -fPIE -mrelax --target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -ggdb" \
+		CFLAGS="-Wno-shift-op-parentheses -Wno-unused-command-line-argument $riscv_cflags -ggdb" \
 		CC="$CC" \
 		AR="$AR" \
 		RANLIB="$RANLIB" \
 		LIBCC="$PWD"/libclang_rt.builtins-riscv64.a \
-		LDFLAGS="-Wl,--emit-relocs -Wl,--no-relax" \
+		LDFLAGS="$riscv_ldflags" \
 		./configure \
 		--prefix="$sysroot" \
 		--target=riscv64 \
@@ -235,9 +238,8 @@ EOF
 	# This is a hack to make `cmake` cross-compilation work on MacOS:
 	# -DCMAKE_C_COMPILER_WORKS=1 -DCMAKE_CXX_COMPILER_WORKS=1
 	run env \
-		CC="$sysroot"/bin/polkavm-cc \
-		CXX="$sysroot"/bin/polkavm-c++ \
-		CXXFLAGS="-I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3" \
+		CXX="$CXX" \
+		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3" \
 		LDFLAGS="-nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -265,8 +267,7 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CC="$sysroot"/bin/polkavm-cc \
-		CXX="$sysroot"/bin/polkavm-c++ \
+		CXX="$CXX" \
 		CXXFLAGS="-I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3" \
 		LDFLAGS="-nostdlib" \
 		cmake \
