@@ -37,22 +37,22 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       ENV: >
-        CC=clang-19
-        LD=clang-19
-        LLD=lld-19
-        AR=llvm-ar-19
-        AS=llvm-as-19
-        NM=llvm-nm-19
-        STRIP=llvm-strip-19
-        OBJCOPY=llvm-objcopy-19
-        OBJDUMP=llvm-objdump-19
-        RANLIB=llvm-ranlib-19
+        CC=clang-20
+        LD=clang-20
+        LLD=lld-20
+        AR=llvm-ar-20
+        AS=llvm-as-20
+        NM=llvm-nm-20
+        STRIP=llvm-strip-20
+        OBJCOPY=llvm-objcopy-20
+        OBJDUMP=llvm-objdump-20
+        RANLIB=llvm-ranlib-20
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Install dependencies
-        run: sudo apt-get -qq update && sudo apt-get -qq install -y clang-19 lld-19 llvm-19 autotools-dev
+        run: sudo apt-get -qq update && sudo apt-get -qq install -y clang-20 lld-20 llvm-20 autotools-dev
       - name: Install rust-src
         run: rustup component add rust-src
       - name: Check that setup script works
