@@ -7,6 +7,8 @@ libunwind_url=https://github.com/libunwind/libunwind
 picoalloc_tag=v5.2.0
 picoalloc_url=https://github.com/koute/picoalloc
 polkatool_version=0.29.0
+llvm_tag=llvmorg-22.1.0
+llvm_url=https://github.com/llvm/llvm-project
 
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
@@ -178,7 +180,7 @@ for x in "\$@"; do
 	*) ;;
 	esac
 done
-exec "$CXX" --config=$sysroot/clang\$suffix.cfg "\$@"
+exec "$CXX" --config=$sysroot/clang++\$suffix.cfg "\$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
 	cat >"$sysroot"/bin/polkavm-lld <<EOF
@@ -191,6 +193,8 @@ EOF
 	chmod +x "$sysroot"/bin/polkavm-lld
 	ln -f "$root"/sdk/clang.cfg "$sysroot"/
 	ln -f "$root"/sdk/clang-nostdlib.cfg "$sysroot"/
+	ln -f "$root"/sdk/clang++.cfg "$sysroot"/
+	ln -f "$root"/sdk/clang++-nostdlib.cfg "$sysroot"/
 	sed -e "s|@VENDOR@|$suffix|g" \
 		<"$root"/sdk/riscv64emac-template-linux-musl.json \
 		>"$sysroot"/riscv64emac-"$suffix"-linux-musl.json
@@ -203,11 +207,85 @@ EOF
 	done
 }
 
+libcxx_install() {
+	if ! test -d "$workdir"/llvm; then
+		git clone --depth=1 --branch="$llvm_tag" "$llvm_url" "$workdir"/llvm
+	fi
+	# Configure libcxx first.
+	cd "$workdir"/llvm/libcxx
+	# Fix script permissions.
+	chmod +x utils/generate_iwyu_mapping.py
+	# Remove existing headers from the sysroot.
+	rm -rf $sysroot/include/c++
+	rm -rf build
+	mkdir build
+	cd build
+	run env \
+		CC="$sysroot"/bin/polkavm-cc \
+		CXX="$sysroot"/bin/polkavm-c++ \
+		CXXFLAGS="-I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3" \
+		LDFLAGS="-nostdlib" \
+		cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX="$sysroot" \
+		-DLIBCXX_ENABLE_STATIC=1 \
+		-DLIBCXX_ENABLE_SHARED=0 \
+		-DLIBCXX_ENABLE_EXCEPTIONS=0 \
+		-DLIBCXX_INCLUDE_TESTS=0 \
+		-DLIBCXX_ENABLE_RANDOM_DEVICE=0 \
+		-DLIBCXX_HAS_TERMINAL_AVAILABLE=0 \
+		-DLIBCXX_ENABLE_THREADS=0 \
+		-DLIBCXX_ENABLE_MONOTONIC_CLOCK=0 \
+		-DLIBCXX_ENABLE_TIME_ZONE_DATABASE=0 \
+		-DLIBCXX_INCLUDE_BENCHMARKS=0 \
+		-DLIBCXX_INCLUDE_DOCS=0 \
+		-DLIBCXX_USE_COMPILER_RT=1 \
+		-DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=1 \
+		-DLIBCXX_HAS_MUSL_LIBC=1 \
+		..
+	# Configure libcxxabi.
+	cd "$workdir"/llvm/libcxxabi
+	rm -rf build
+	mkdir build
+	cd build
+	run env \
+		CC="$sysroot"/bin/polkavm-cc \
+		CXX="$sysroot"/bin/polkavm-c++ \
+		CXXFLAGS="-I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3" \
+		LDFLAGS="-nostdlib" \
+		cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX="$sysroot" \
+		-DCMAKE_VERBOSE_MAKEFILE=1 \
+		-DLIBCXXABI_ENABLE_EXCEPTIONS=0 \
+		-DLIBCXXABI_USE_LLVM_UNWINDER=0 \
+		-DLIBCXXABI_ENABLE_STATIC_UNWINDER=1 \
+		-DLIBCXXABI_USE_COMPILER_RT=1 \
+		-DLIBCXXABI_ENABLE_THREADS=0 \
+		-DLIBCXXABI_HAS_PTHREAD_API=0 \
+		-DLIBCXXABI_INCLUDE_TESTS=0 \
+		-DLIBCXXABI_ENABLE_SHARED=0 \
+		-DLIBCXXABI_ENABLE_STATIC=1 \
+		-DLIBCXXABI_SILENT_TERMINATE=1 \
+		..
+	# Build libcxxabi.
+	run make -j
+	run make install
+	# Build libcxx.
+	cd "$workdir"/llvm/libcxx/build
+	run make -j
+	# Run the script manually (cmake doesn't run it for some reason).
+	../utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp
+	run make install
+	cd "$root"
+}
+
 run_single() {
 	case "$1" in
 	musl)
 		suffix=corevm
 		sysroot="$root"/sysroot-"$suffix"
+		picoalloc_build corevm --features corevm
 		musl_build
 		musl_install
 		;;
@@ -240,6 +318,7 @@ main() {
 		musl_install
 		linux_install
 		libunwind_install
+		libcxx_install
 	done
 	cat <<'EOF'
 

@@ -46,7 +46,7 @@ build_rust_apps() {
 				--version 0.1 \
 				--license 'Apache-2.0' \
 				--author 'Parity Technologies <admin@parity.io>' \
-				target/"$rust_target"/debug/"$package"
+				"$workdir"/"$package"."$suffix"
 		fi
 	done
 }
