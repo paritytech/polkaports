@@ -208,20 +208,36 @@ EOF
 	for name in libgcc_s libgcc libgcc_eh; do
 		touch "$sysroot"/lib/"$name".a
 	done
-}
-
-libcxx_install() {
+    # CMake cross-compilation configuration.
 	cat >"$sysroot"/toolchain.cmake <<EOF
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_C_COMPILER $sysroot/bin/polkavm-cc)
 set(CMAKE_CXX_COMPILER $sysroot/bin/polkavm-c++)
-set(CMAKE_C_COMPILER_WORKS 1)
-set(CMAKE_CXX_COMPILER_WORKS 1)
 set(CMAKE_FIND_ROOT_PATH $sysroot)
 set(CMAKE_SYSROOT $sysroot)
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+# This is a hack to make cmake cross-compilation work on MacOS.
+set(CMAKE_C_COMPILER_WORKS 1)
+set(CMAKE_CXX_COMPILER_WORKS 1)
+EOF
+}
+
+libcxx_install() {
+    # Custom config just for libcxx.
+	cat >"$workdir"/libcxx.cmake <<EOF
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_C_COMPILER $CC)
+set(CMAKE_CXX_COMPILER $CXX)
+set(CMAKE_FIND_ROOT_PATH $sysroot)
+set(CMAKE_SYSROOT $sysroot)
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+# This is a hack to make cmake cross-compilation work on MacOS.
+set(CMAKE_C_COMPILER_WORKS 1)
+set(CMAKE_CXX_COMPILER_WORKS 1)
 EOF
 	if ! test -d "$workdir"/llvm; then
 		git clone --depth=1 --branch="$llvm_tag" "$llvm_url" "$workdir"/llvm
@@ -235,20 +251,17 @@ EOF
 	rm -rf build
 	mkdir build
 	cd build
-	# This is a hack to make `cmake` cross-compilation work on MacOS:
-	# -DCMAKE_C_COMPILER_WORKS=1 -DCMAKE_CXX_COMPILER_WORKS=1
 	run env \
-		CXX="$CXX" \
 		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3" \
 		LDFLAGS="-nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX="$sysroot" \
-		-DCMAKE_TOOLCHAIN_FILE="$sysroot"/toolchain.cmake \
+		-DCMAKE_TOOLCHAIN_FILE="$workdir"/libcxx.cmake \
 		-DLIBCXX_ENABLE_STATIC=1 \
 		-DLIBCXX_ENABLE_SHARED=0 \
 		-DLIBCXX_ENABLE_EXCEPTIONS=0 \
-		-DLIBCXX_ENABLE_RTTI=0 \
+		-DLIBCXX_ENABLE_RTTI=1 \
 		-DLIBCXX_INCLUDE_TESTS=0 \
 		-DLIBCXX_ENABLE_RANDOM_DEVICE=0 \
 		-DLIBCXX_HAS_TERMINAL_AVAILABLE=0 \
@@ -267,14 +280,13 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXX="$CXX" \
 		CXXFLAGS="-I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3" \
 		LDFLAGS="-nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX="$sysroot" \
 		-DCMAKE_VERBOSE_MAKEFILE=1 \
-		-DCMAKE_TOOLCHAIN_FILE="$sysroot"/toolchain.cmake \
+		-DCMAKE_TOOLCHAIN_FILE="$workdir"/libcxx.cmake \
 		-DLIBCXXABI_ENABLE_EXCEPTIONS=0 \
 		-DLIBCXXABI_USE_LLVM_UNWINDER=0 \
 		-DLIBCXXABI_ENABLE_STATIC_UNWINDER=1 \
