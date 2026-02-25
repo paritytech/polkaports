@@ -220,6 +220,8 @@ libcxx_install() {
 	rm -rf build
 	mkdir build
 	cd build
+    # This is a hack to make `cmake` cross-compilation work on MacOS:
+    # -DCMAKE_C_COMPILER_WORKS=1 -DCMAKE_CXX_COMPILER_WORKS=1
 	run env \
 		CC="$sysroot"/bin/polkavm-cc \
 		CXX="$sysroot"/bin/polkavm-c++ \

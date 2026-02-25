@@ -10,6 +10,8 @@ main() {
 	build_quake
 	build_busybox
 	build_rust_apps
+	build_c_apps
+	build_cxx_apps
 }
 
 build_quake() {
@@ -49,6 +51,16 @@ build_rust_apps() {
 				"$workdir"/"$package"."$suffix"
 		fi
 	done
+}
+
+build_c_apps() {
+	cd "$root"/apps/c
+	make
+}
+
+build_cxx_apps() {
+	cd "$root"/apps/c++
+	make
 }
 
 run() {
