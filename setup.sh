@@ -223,6 +223,7 @@ libcxx_install() {
 	run env \
 		CC="$sysroot"/bin/polkavm-cc \
 		CXX="$sysroot"/bin/polkavm-c++ \
+		LD="$sysroot"/bin/polkavm-c++ \
 		CXXFLAGS="-I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3" \
 		LDFLAGS="-nostdlib" \
 		cmake \
@@ -251,6 +252,7 @@ libcxx_install() {
 	run env \
 		CC="$sysroot"/bin/polkavm-cc \
 		CXX="$sysroot"/bin/polkavm-c++ \
+		LD="$sysroot"/bin/polkavm-c++ \
 		CXXFLAGS="-I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3" \
 		LDFLAGS="-nostdlib" \
 		cmake \
