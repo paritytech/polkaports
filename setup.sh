@@ -7,12 +7,17 @@ libunwind_url=https://github.com/libunwind/libunwind
 picoalloc_tag=v5.2.0
 picoalloc_url=https://github.com/koute/picoalloc
 polkatool_version=0.29.0
+llvm_tag=llvmorg-22.1.0
+llvm_url=https://github.com/llvm/llvm-project
 
 CC="${CC:-clang}"
 CXX="${CXX:-clang++}"
 LLD="${LLD:-lld}"
 AR="${AR:-llvm-ar}"
 RANLIB="${RANLIB:-llvm-ranlib}"
+
+riscv_cflags="--target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -fpic -fPIE -mrelax"
+riscv_ldflags="-Wl,--emit-relocs -Wl,--no-relax"
 
 run() {
 	set +e
@@ -45,7 +50,7 @@ picoalloc_build() {
 	fi
 	cd "$workdir"/picoalloc
 	rm -rf target
-    target_json="$("$sysroot"/bin/polkatool get-target-json-path)"
+	target_json="$("$sysroot"/bin/polkatool get-target-json-path)"
 	RUSTC_BOOTSTRAP=1 cargo build \
 		-Zbuild-std=core,alloc \
 		--quiet \
@@ -61,12 +66,12 @@ musl_build() {
 	cd "$root"/libs/musl
 	mkdir -p src/malloc/mallocng
 	run env \
-		CFLAGS="-Wno-shift-op-parentheses -Wno-unused-command-line-argument -fpic -fPIE -mrelax --target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -ggdb" \
+		CFLAGS="-Wno-shift-op-parentheses -Wno-unused-command-line-argument $riscv_cflags -ggdb" \
 		CC="$CC" \
 		AR="$AR" \
 		RANLIB="$RANLIB" \
 		LIBCC="$PWD"/libclang_rt.builtins-riscv64.a \
-		LDFLAGS="-Wl,--emit-relocs -Wl,--no-relax" \
+		LDFLAGS="$riscv_ldflags" \
 		./configure \
 		--prefix="$sysroot" \
 		--target=riscv64 \
@@ -178,7 +183,7 @@ for x in "\$@"; do
 	*) ;;
 	esac
 done
-exec "$CXX" --config=$sysroot/clang\$suffix.cfg "\$@"
+exec "$CXX" --config=$sysroot/clang++\$suffix.cfg "\$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
 	cat >"$sysroot"/bin/polkavm-lld <<EOF
@@ -191,6 +196,8 @@ EOF
 	chmod +x "$sysroot"/bin/polkavm-lld
 	ln -f "$root"/sdk/clang.cfg "$sysroot"/
 	ln -f "$root"/sdk/clang-nostdlib.cfg "$sysroot"/
+	ln -f "$root"/sdk/clang++.cfg "$sysroot"/
+	ln -f "$root"/sdk/clang++-nostdlib.cfg "$sysroot"/
 	sed -e "s|@VENDOR@|$suffix|g" \
 		<"$root"/sdk/riscv64emac-template-linux-musl.json \
 		>"$sysroot"/riscv64emac-"$suffix"-linux-musl.json
@@ -201,6 +208,106 @@ EOF
 	for name in libgcc_s libgcc libgcc_eh; do
 		touch "$sysroot"/lib/"$name".a
 	done
+    # CMake cross-compilation configuration.
+	cat >"$sysroot"/toolchain.cmake <<EOF
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_C_COMPILER $sysroot/bin/polkavm-cc)
+set(CMAKE_CXX_COMPILER $sysroot/bin/polkavm-c++)
+set(CMAKE_FIND_ROOT_PATH $sysroot)
+set(CMAKE_SYSROOT $sysroot)
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+# This is a hack to make cmake cross-compilation work on MacOS.
+set(CMAKE_C_COMPILER_WORKS 1)
+set(CMAKE_CXX_COMPILER_WORKS 1)
+EOF
+}
+
+libcxx_install() {
+    # Custom config just for libcxx.
+	cat >"$workdir"/libcxx.cmake <<EOF
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_C_COMPILER $CC)
+set(CMAKE_CXX_COMPILER $CXX)
+set(CMAKE_FIND_ROOT_PATH $sysroot)
+set(CMAKE_SYSROOT $sysroot)
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+# This is a hack to make cmake cross-compilation work on MacOS.
+set(CMAKE_C_COMPILER_WORKS 1)
+set(CMAKE_CXX_COMPILER_WORKS 1)
+EOF
+	if ! test -d "$workdir"/llvm; then
+		git clone --depth=1 --branch="$llvm_tag" "$llvm_url" "$workdir"/llvm
+	fi
+	# Configure libcxx first.
+	cd "$workdir"/llvm/libcxx
+	# Fix script permissions.
+	chmod +x utils/generate_iwyu_mapping.py
+	# Remove existing headers from the sysroot.
+	rm -rf $sysroot/include/c++
+	rm -rf build
+	mkdir build
+	cd build
+	run env \
+		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3" \
+		LDFLAGS="$riscv_ldflags -nostdlib" \
+		cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX="$sysroot" \
+		-DCMAKE_TOOLCHAIN_FILE="$workdir"/libcxx.cmake \
+		-DLIBCXX_ENABLE_STATIC=1 \
+		-DLIBCXX_ENABLE_SHARED=0 \
+		-DLIBCXX_ENABLE_EXCEPTIONS=0 \
+		-DLIBCXX_ENABLE_RTTI=1 \
+		-DLIBCXX_INCLUDE_TESTS=0 \
+		-DLIBCXX_ENABLE_RANDOM_DEVICE=0 \
+		-DLIBCXX_HAS_TERMINAL_AVAILABLE=0 \
+		-DLIBCXX_ENABLE_THREADS=0 \
+		-DLIBCXX_ENABLE_MONOTONIC_CLOCK=0 \
+		-DLIBCXX_ENABLE_TIME_ZONE_DATABASE=0 \
+		-DLIBCXX_INCLUDE_BENCHMARKS=0 \
+		-DLIBCXX_INCLUDE_DOCS=0 \
+		-DLIBCXX_USE_COMPILER_RT=1 \
+		-DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=1 \
+		-DLIBCXX_HAS_MUSL_LIBC=1 \
+		..
+	# Configure libcxxabi.
+	cd "$workdir"/llvm/libcxxabi
+	rm -rf build
+	mkdir build
+	cd build
+	run env \
+		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3" \
+		LDFLAGS="$riscv_ldflags -nostdlib" \
+		cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX="$sysroot" \
+		-DCMAKE_VERBOSE_MAKEFILE=1 \
+		-DCMAKE_TOOLCHAIN_FILE="$workdir"/libcxx.cmake \
+		-DLIBCXXABI_ENABLE_EXCEPTIONS=0 \
+		-DLIBCXXABI_USE_LLVM_UNWINDER=0 \
+		-DLIBCXXABI_ENABLE_STATIC_UNWINDER=1 \
+		-DLIBCXXABI_USE_COMPILER_RT=1 \
+		-DLIBCXXABI_ENABLE_THREADS=0 \
+		-DLIBCXXABI_HAS_PTHREAD_API=0 \
+		-DLIBCXXABI_INCLUDE_TESTS=0 \
+		-DLIBCXXABI_ENABLE_SHARED=0 \
+		-DLIBCXXABI_ENABLE_STATIC=1 \
+		-DLIBCXXABI_SILENT_TERMINATE=1 \
+		..
+	# Build libcxxabi.
+	run make -j
+	run make install
+	# Build libcxx.
+	cd "$workdir"/llvm/libcxx/build
+	run make -j
+	# Run the script manually (cmake doesn't run it for some reason).
+	../utils/generate_iwyu_mapping.py -o include/c++/v1/libcxx.imp
+	run make install
+	cd "$root"
 }
 
 run_single() {
@@ -208,6 +315,7 @@ run_single() {
 	musl)
 		suffix=corevm
 		sysroot="$root"/sysroot-"$suffix"
+		picoalloc_build corevm --features corevm
 		musl_build
 		musl_install
 		;;
@@ -240,6 +348,7 @@ main() {
 		musl_install
 		linux_install
 		libunwind_install
+		libcxx_install
 	done
 	cat <<'EOF'
 
