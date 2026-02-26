@@ -253,7 +253,7 @@ EOF
 	cd build
 	run env \
 		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3" \
-		LDFLAGS="-nostdlib" \
+		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX="$sysroot" \
@@ -280,8 +280,8 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXXFLAGS="-I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3" \
-		LDFLAGS="-nostdlib" \
+		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3" \
+		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX="$sysroot" \
