@@ -1,0 +1,70 @@
+#!/bin/sh
+
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+SYSROOT_FILENAME="sysroot-riscv64emac.tar.zst"
+TOOLS_FILENAME="tools-$OS-$ARCH.tar.zst"
+
+main() {
+	set -ex
+	workdir="$(mktemp -d)"
+	trap cleanup EXIT
+	root="$PWD"
+	set_permissions
+	create_sysroot_archive
+	create_tools_archive
+	b2sum "$SYSROOT_FILENAME" "$TOOLS_FILENAME"
+}
+
+set_permissions() {
+    # Reproducible permissions.
+	find sysroot-corevm -type f -exec chmod 0644 \{\} \;
+	find sysroot-corevm -type l -exec chmod --no-dereference 0777 \{\} \;
+	find sysroot-corevm/bin -type f -exec chmod 0755 \{\} \;
+	find sysroot-corevm/* -type d -exec chmod 0755 \{\} \;
+}
+
+create_sysroot_archive() {
+	# Resulting archive should be reproducible between CI job runs.
+	cd sysroot-corevm
+	{
+		# We only care about non-hidden files, directories and symbolic links.
+		find * -type f -not -name '.*' -print0
+		find * -type d -not -name '.*' -print0
+		find * -type l -not -name '.*' -print0
+	} | grep -zv '^bin' | env LC_ALL=C sort --zero-terminated >"$workdir"/files
+	create_tar_archive "$workdir"/files "$root"/"$SYSROOT_FILENAME"
+	cd "$root"
+}
+
+create_tools_archive() {
+	# Resulting archive should be reproducible between CI job runs.
+	cd sysroot-corevm/bin
+	{
+		# We only care about non-hidden files, directories and symbolic links.
+		find * -type f -not -name '.*' -print0
+		find * -type d -not -name '.*' -print0
+		find * -type l -not -name '.*' -print0
+	} | env LC_ALL=C sort --zero-terminated >"$workdir"/files
+	create_tar_archive "$workdir"/files "$root"/"$TOOLS_FILENAME"
+	cd "$root"
+}
+
+create_tar_archive() {
+	rm -f "$2"
+	tar --create \
+		--mtime=@0 \
+		--numeric-owner \
+		--owner=0 \
+		--group=0 \
+		--null \
+		--files-from="$1" \
+		--file=- |
+		zstd --quiet --compress -10 -o "$2"
+}
+
+cleanup() {
+	rm -rf "$workdir"
+}
+
+main

@@ -7,6 +7,7 @@ libunwind_url=https://github.com/libunwind/libunwind
 picoalloc_tag=v5.2.0
 picoalloc_url=https://github.com/koute/picoalloc
 polkatool_version=0.29.0
+jam_program_blob_version=0.1.26
 llvm_tag=llvmorg-22.1.0
 llvm_url=https://github.com/llvm/llvm-project
 
@@ -35,11 +36,11 @@ cleanup() {
 }
 
 polkatool_install() {
-	cargo install --quiet --root "$sysroot" polkatool@$polkatool_version
+	cargo install --quiet --root "$sysroot" "$@" polkatool@$polkatool_version
 }
 
 jam_program_blob_install() {
-	cargo install --quiet --root "$sysroot" jam-program-blob
+	cargo install --quiet --root "$sysroot" "$@" jam-program-blob@$jam_program_blob_version
 }
 
 picoalloc_build() {
@@ -75,7 +76,7 @@ musl_build() {
 		./configure \
 		--prefix="$sysroot" \
 		--target=riscv64 \
-		--enable-wrapper=clang \
+		--disable-wrapper \
 		--disable-shared
 	run make clean
 	run make -j
@@ -162,36 +163,42 @@ linux_install() {
 sysroot_init() {
 	rm -rf "$sysroot"/bin
 	mkdir -p "$sysroot"/bin
-	cat >"$sysroot"/bin/polkavm-cc <<EOF
+	export COREVM_SYSROOT="$sysroot"
+	export COREVM_CC="$CC"
+	export COREVM_CXX="$CXX"
+	export COREVM_LLD="$LLD"
+	cat >"$sysroot"/bin/polkavm-cc <<'EOF'
 #!/bin/sh
 suffix=
-for x in "\$@"; do
-	case "\$x" in
+for x in "$@"; do
+	case "$x" in
 	-nostdlib) suffix=-nostdlib ;;
 	*) ;;
 	esac
 done
-exec "$CC" --config=$sysroot/clang\$suffix.cfg "\$@"
+exec "$COREVM_CC" --config="$COREVM_SYSROOT"/clang$suffix.cfg "$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-cc
-	cat >"$sysroot"/bin/polkavm-c++ <<EOF
+	cat >"$sysroot"/bin/polkavm-c++ <<'EOF'
 #!/bin/sh
 suffix=
-for x in "\$@"; do
-	case "\$x" in
+for x in "$@"; do
+	case "$x" in
 	-nostdlib) suffix=-nostdlib ;;
 	*) ;;
 	esac
 done
-exec "$CXX" --config=$sysroot/clang++\$suffix.cfg "\$@"
+exec "$COREVM_CXX" --config="$COREVM_SYSROOT"/clang++$suffix.cfg "$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
-	cat >"$sysroot"/bin/polkavm-lld <<EOF
+	cat >"$sysroot"/bin/polkavm-lld <<'EOF'
 #!/bin/sh
-exec "$LLD" "\$@" --sysroot="$sysroot" -L$sysroot/lib \
-	$sysroot/lib/Scrt1.o \
-	$sysroot/lib/crti.o \
-	$sysroot/lib/crtn.o
+exec "$COREVM_LLD" "$@" \
+    --sysroot="$COREVM_SYSROOT" \
+    -L"$COREVM_SYSROOT"/lib \
+    "$COREVM_SYSROOT"/lib/Scrt1.o \
+    "$COREVM_SYSROOT"/lib/crti.o \
+    "$COREVM_SYSROOT"/lib/crtn.o
 EOF
 	chmod +x "$sysroot"/bin/polkavm-lld
 	ln -f "$root"/sdk/clang.cfg "$sysroot"/
@@ -335,11 +342,16 @@ main() {
 		run_single "$1"
 		exit 0
 	fi
-	for suffix in polkavm corevm; do
+	for suffix in corevm; do
 		sysroot="$root"/sysroot-"$suffix"
 		sysroot_init
-		polkatool_install
-		jam_program_blob_install
+		if test -n "$TOOLS_RUST_TARGET"; then
+			polkatool_install --target "$TOOLS_RUST_TARGET"
+			jam_program_blob_install --target "$TOOLS_RUST_TARGET"
+		else
+			polkatool_install
+			jam_program_blob_install
+		fi
 		case "$suffix" in
 		polkavm) picoalloc_build polkavm ;;
 		corevm) picoalloc_build corevm --features corevm ;;
@@ -349,15 +361,15 @@ main() {
 		linux_install
 		libunwind_install
 		libcxx_install
+		rm -rf "$sysroot"/share/man
 	done
 	cat <<'EOF'
 
 Setup finished!
 
-Type one of the following commands to activate the toolchain.
+Type the following command to activate the toolchain.
 
     . ./activate.sh corevm
-    . ./activate.sh polkavm
 
 EOF
 }

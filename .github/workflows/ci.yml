@@ -48,6 +48,7 @@ jobs:
         OBJCOPY=llvm-objcopy-20
         OBJDUMP=llvm-objdump-20
         RANLIB=llvm-ranlib-20
+        TOOLS_RUST_TARGET=x86_64-unknown-linux-musl
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,13 +56,27 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get -qq update && sudo apt-get -qq install -y clang-20 lld-20 llvm-20 autotools-dev
       - name: Install rust-src
-        run: rustup component add rust-src
+        run: |
+          rustup component add rust-src
+          rustup default
+          rustup target add x86_64-unknown-linux-musl
+          rustup default stable
       - name: Check that setup script works
         run: env $ENV ./setup.sh
-      - name: Check that our tools work (CoreVM)
+      - name: Check that our tools work
         run: env $ENV ./ci/apps.sh corevm
-      - name: Check that our tools work (PolkaVM)
-        run: env $ENV ./ci/apps.sh polkavm
+      - name: Create distribution archive
+        run: ./ci/dist.sh
+      - name: Upload archives as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-archives
+          path: |
+            sysroot-riscv64emac.tar.zst
+            tools-Linux-x86_64.tar.zst
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
 
   setup-macos:
     name: Run setup script on MacOS
@@ -77,7 +92,75 @@ jobs:
         run: rustup component add rust-src
       - name: Check that setup script works
         run: ./setup.sh
-      - name: Check that our tools work (CoreVM)
+      - name: Check that our tools work
         run: ./ci/apps.sh corevm
-      - name: Check that our tools work (PolkaVM)
-        run: ./ci/apps.sh polkavm
+      - name: Upload archives as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-archives
+          path: tools-Darwin-aarch64.tar.zst
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
+
+  create-release:
+    name: Create binary release
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    needs: [setup-linux, setup-macos]
+    #  TODO
+    #  if: github.ref_type == 'tag'
+    permissions:
+      contents: write
+    steps:
+      - name: Download Linux archives
+        uses: actions/download-artifact@v5
+        with:
+          name: linux-archives
+      - name: Download MacOS archives
+        uses: actions/download-artifact@v5
+        with:
+          name: macos-archives
+      - name: Rename archives
+        run: |
+          ls -l
+          mv sysroot-riscv64emac.tar.zst sysroot-${{ github.ref_name }}-riscv64emac.tar.zst
+          mv tools-Linux-x86_64.tar.zst tools-${{ github.ref_name }}-Linux-x86_64.tar.zst
+          mv tools-Darwin-aarch64.tar.zst tools-${{ github.ref_name }}-Darwin-aarch64.tar.zst
+      - name: Create release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: true
+          prerelease: false
+      - name: Upload sysroot-riscv64emac.tar.zst
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: sysroot-${{ github.ref_name }}-riscv64emac.tar.zst
+          asset_name: sysroot-${{ github.ref_name }}-riscv64emac.tar.zst
+          asset_content_type: application/zstd
+      - name: Upload tools-Linux-x86_64.tar.zst
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: tools-${{ github.ref_name }}-Linux-x86_64.tar.zst
+          asset_name: tools-${{ github.ref_name }}-Linux-x86_64.tar.zst
+          asset_content_type: application/zstd
+      - name: Upload tools-Darwin-aarch64.tar.zst
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: tools-${{ github.ref_name }}-Darwin-aarch64.tar.zst
+          asset_name: tools-${{ github.ref_name }}-Darwin-aarch64.tar.zst
+          asset_content_type: application/zstd
