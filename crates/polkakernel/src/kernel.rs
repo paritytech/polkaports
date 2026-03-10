@@ -422,7 +422,7 @@ impl<C: Machine + Environment + FileSystem> Kernel<C> {
 				env!("CARGO_PKG_VERSION")
 			)
 			.as_bytes()),
-			// Linux version. See `sysroot-corevm/include/linux/version.h`.
+			// Linux version. See `sysroot/include/linux/version.h`.
 			release: utsname_field!(b"6.15.0"),
 			machine: utsname_field!(b"riscv64emac"),
 			domainname: [0_u8; 65],

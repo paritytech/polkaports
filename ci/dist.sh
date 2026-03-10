@@ -18,10 +18,10 @@ main() {
 
 set_permissions() {
     # Reproducible permissions.
-	find sysroot-corevm -type f -exec chmod 0644 \{\} \;
-	find sysroot-corevm -type l -exec chmod --no-dereference 0777 \{\} \;
-	find sysroot-corevm/bin -type f -exec chmod 0755 \{\} \;
-	find sysroot-corevm/* -type d -exec chmod 0755 \{\} \;
+	find sysroot -type f -exec chmod 0644 \{\} \;
+	find sysroot -type l -exec chmod --no-dereference 0777 \{\} \;
+	find sysroot/bin -type f -exec chmod 0755 \{\} \;
+	find sysroot/* -type d -exec chmod 0755 \{\} \;
 }
 
 create_sysroot_archive() {
@@ -31,7 +31,7 @@ create_sysroot_archive() {
     #    return
     #fi
 	# Resulting archive should be reproducible between CI job runs.
-	cd sysroot-corevm
+	cd sysroot
 	{
 		# We only care about non-hidden files, directories and symbolic links.
 		find * -type f -not -name '.*' -print0
@@ -44,7 +44,7 @@ create_sysroot_archive() {
 
 create_tools_archive() {
 	# Resulting archive should be reproducible between CI job runs.
-	cd sysroot-corevm/bin
+	cd sysroot/bin
 	{
 		# We only care about non-hidden files, directories and symbolic links.
 		find * -type f -not -name '.*' -print0
