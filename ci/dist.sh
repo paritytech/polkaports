@@ -1,9 +1,9 @@
 #!/bin/sh
 
-OS="$(uname -s)"
+KERNEL="$(uname -s)"
 ARCH="$(uname -m)"
-SYSROOT_FILENAME="sysroot-riscv64emac.tar.zst"
-TOOLS_FILENAME="tools-$OS-$ARCH.tar.zst"
+SYSROOT_FILENAME="sysroot-$KERNEL-riscv64emac.tar.zst"
+TOOLS_FILENAME="tools-$KERNEL-$ARCH.tar.zst"
 
 main() {
 	set -ex
@@ -11,7 +11,7 @@ main() {
 	trap cleanup EXIT
 	root="$PWD"
 	set_permissions
-	create_sysroot_archive
+    create_sysroot_archive
 	create_tools_archive
 	b2sum "$SYSROOT_FILENAME" "$TOOLS_FILENAME"
 }
@@ -25,6 +25,11 @@ set_permissions() {
 }
 
 create_sysroot_archive() {
+    # TODO
+    #if test "$KERNEL" != Linux; then
+    #    # System root shouldn't depend on host OS.
+    #    return
+    #fi
 	# Resulting archive should be reproducible between CI job runs.
 	cd sysroot-corevm
 	{

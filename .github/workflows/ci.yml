@@ -36,35 +36,22 @@ jobs:
     timeout-minutes: 20
     runs-on: ubuntu-24.04
     env:
-      ENV: >
-        CC=clang-20
-        CXX=clang++-20
-        LD=clang-20
-        LLD=lld-20
-        AR=llvm-ar-20
-        AS=llvm-as-20
-        NM=llvm-nm-20
-        STRIP=llvm-strip-20
-        OBJCOPY=llvm-objcopy-20
-        OBJDUMP=llvm-objdump-20
-        RANLIB=llvm-ranlib-20
-        TOOLS_RUST_TARGET=x86_64-unknown-linux-musl
+      TOOLS_RUST_TARGET: x86_64-unknown-linux-musl
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Install dependencies
-        run: sudo apt-get -qq update && sudo apt-get -qq install -y clang-20 lld-20 llvm-20 autotools-dev
+        run: ./ci/apt.sh
       - name: Install rust-src
         run: |
           rustup component add rust-src
-          rustup default
           rustup target add x86_64-unknown-linux-musl
           rustup default stable
       - name: Check that setup script works
-        run: env $ENV ./setup.sh
+        run: ./setup.sh
       - name: Check that our tools work
-        run: env $ENV ./ci/apps.sh corevm
+        run: ./ci/apps.sh corevm
       - name: Create distribution archive
         run: ./ci/dist.sh
       - name: Upload archives as artifacts
@@ -72,7 +59,7 @@ jobs:
         with:
           name: linux-archives
           path: |
-            sysroot-riscv64emac.tar.zst
+            sysroot-Linux-riscv64emac.tar.zst
             tools-Linux-x86_64.tar.zst
           compression-level: 0
           if-no-files-found: error
@@ -94,11 +81,15 @@ jobs:
         run: ./setup.sh
       - name: Check that our tools work
         run: ./ci/apps.sh corevm
+      - name: Create distribution archive
+        run: ./ci/dist.sh
       - name: Upload archives as artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-archives
-          path: tools-Darwin-aarch64.tar.zst
+          path: |
+            sysroot-Darwin-riscv64emac.tar.zst
+            tools-Darwin-aarch64.tar.zst
           compression-level: 0
           if-no-files-found: error
           retention-days: 1
@@ -124,7 +115,8 @@ jobs:
       - name: Rename archives
         run: |
           ls -l
-          mv sysroot-riscv64emac.tar.zst sysroot-${{ github.ref_name }}-riscv64emac.tar.zst
+          mv sysroot-Linux-riscv64emac.tar.zst sysroot-${{ github.ref_name }}-Linux-riscv64emac.tar.zst
+          mv sysroot-Darwin-riscv64emac.tar.zst sysroot-${{ github.ref_name }}-Darwin-riscv64emac.tar.zst
           mv tools-Linux-x86_64.tar.zst tools-${{ github.ref_name }}-Linux-x86_64.tar.zst
           mv tools-Darwin-aarch64.tar.zst tools-${{ github.ref_name }}-Darwin-aarch64.tar.zst
       - name: Create release
@@ -137,14 +129,23 @@ jobs:
           release_name: Release ${{ github.ref_name }}
           draft: true
           prerelease: false
-      - name: Upload sysroot-riscv64emac.tar.zst
+      - name: Upload system root (Linux)
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: sysroot-${{ github.ref_name }}-riscv64emac.tar.zst
-          asset_name: sysroot-${{ github.ref_name }}-riscv64emac.tar.zst
+          asset_path: sysroot-${{ github.ref_name }}-Linux-riscv64emac.tar.zst
+          asset_name: sysroot-${{ github.ref_name }}-Linux-riscv64emac.tar.zst
+          asset_content_type: application/zstd
+      - name: Upload system root (Darwin)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: sysroot-${{ github.ref_name }}-Darwin-riscv64emac.tar.zst
+          asset_name: sysroot-${{ github.ref_name }}-Darwin-riscv64emac.tar.zst
           asset_content_type: application/zstd
       - name: Upload tools-Linux-x86_64.tar.zst
         uses: actions/upload-release-asset@v1

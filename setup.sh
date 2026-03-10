@@ -67,7 +67,7 @@ musl_build() {
 	cd "$root"/libs/musl
 	mkdir -p src/malloc/mallocng
 	run env \
-		CFLAGS="-Wno-shift-op-parentheses -Wno-unused-command-line-argument $riscv_cflags -ggdb" \
+		CFLAGS="$riscv_cflags -O3 -ggdb" \
 		CC="$CC" \
 		AR="$AR" \
 		RANLIB="$RANLIB" \
