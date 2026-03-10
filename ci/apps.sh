@@ -2,8 +2,7 @@
 
 main() {
 	set -ex
-	suffix="$1"
-	. ./activate.sh "$suffix"
+	. ./activate.sh
 	root="$PWD"
 	workdir="$(mktemp -d)"
 	trap cleanup EXIT
@@ -26,7 +25,7 @@ build_busybox() {
 }
 
 build_rust_apps() {
-	rust_target=riscv64emac-"$suffix"-linux-musl
+	rust_target=riscv64emac-corevm-linux-musl
 	rust_stack_size=8388608
 	cd "$root"
 	rm -rf target/riscv64emac-corevm-linux-musl
@@ -41,15 +40,13 @@ build_rust_apps() {
 			-Zbuild-std-features=panic_immediate_abort
 		polkatool link --min-stack-size "$rust_stack_size" \
 			target/"$rust_target"/debug/"$package" \
-			-o "$workdir"/"$package"."$suffix"
-		if test "$suffix" = "corevm"; then
-			jam-blob set-meta \
-				--name "$package" \
-				--version 0.1 \
-				--license 'Apache-2.0' \
-				--author 'Parity Technologies <admin@parity.io>' \
-				"$workdir"/"$package"."$suffix"
-		fi
+			-o "$workdir"/"$package".corevm
+		jam-blob set-meta \
+			--name "$package" \
+			--version 0.1 \
+			--license 'Apache-2.0' \
+			--author 'Parity Technologies <admin@parity.io>' \
+			"$workdir"/"$package".corevm
 	done
 }
 

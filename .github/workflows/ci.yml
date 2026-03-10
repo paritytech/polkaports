@@ -51,7 +51,7 @@ jobs:
       - name: Check that setup script works
         run: ./setup.sh
       - name: Check that our tools work
-        run: ./ci/apps.sh corevm
+        run: ./ci/apps.sh
       - name: Create distribution archive
         run: ./ci/dist.sh
       - name: Upload archives as artifacts
@@ -80,7 +80,7 @@ jobs:
       - name: Check that setup script works
         run: ./setup.sh
       - name: Check that our tools work
-        run: ./ci/apps.sh corevm
+        run: ./ci/apps.sh
       - name: Create distribution archive
         run: ./ci/dist.sh
       - name: Upload archives as artifacts
@@ -89,7 +89,7 @@ jobs:
           name: macos-archives
           path: |
             sysroot-Darwin-riscv64emac.tar.zst
-            tools-Darwin-aarch64.tar.zst
+            tools-Darwin-arm64.tar.zst
           compression-level: 0
           if-no-files-found: error
           retention-days: 1
@@ -118,7 +118,7 @@ jobs:
           mv sysroot-Linux-riscv64emac.tar.zst sysroot-${{ github.ref_name }}-Linux-riscv64emac.tar.zst
           mv sysroot-Darwin-riscv64emac.tar.zst sysroot-${{ github.ref_name }}-Darwin-riscv64emac.tar.zst
           mv tools-Linux-x86_64.tar.zst tools-${{ github.ref_name }}-Linux-x86_64.tar.zst
-          mv tools-Darwin-aarch64.tar.zst tools-${{ github.ref_name }}-Darwin-aarch64.tar.zst
+          mv tools-Darwin-arm64.tar.zst tools-${{ github.ref_name }}-Darwin-arm64.tar.zst
       - name: Create release
         uses: actions/create-release@v1
         id: create_release
@@ -156,12 +156,12 @@ jobs:
           asset_path: tools-${{ github.ref_name }}-Linux-x86_64.tar.zst
           asset_name: tools-${{ github.ref_name }}-Linux-x86_64.tar.zst
           asset_content_type: application/zstd
-      - name: Upload tools-Darwin-aarch64.tar.zst
+      - name: Upload tools-Darwin-arm64.tar.zst
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: tools-${{ github.ref_name }}-Darwin-aarch64.tar.zst
-          asset_name: tools-${{ github.ref_name }}-Darwin-aarch64.tar.zst
+          asset_path: tools-${{ github.ref_name }}-Darwin-arm64.tar.zst
+          asset_name: tools-${{ github.ref_name }}-Darwin-arm64.tar.zst
           asset_content_type: application/zstd

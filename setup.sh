@@ -2,8 +2,6 @@
 
 linux_tag=v6.15
 linux_url=https://github.com/torvalds/linux
-libunwind_tag=v1.8.2
-libunwind_url=https://github.com/libunwind/libunwind
 picoalloc_tag=v5.2.0
 picoalloc_url=https://github.com/koute/picoalloc
 polkatool_version=0.29.0
@@ -16,6 +14,7 @@ CXX="${CXX:-clang++}"
 LLD="${LLD:-lld}"
 AR="${AR:-llvm-ar}"
 RANLIB="${RANLIB:-llvm-ranlib}"
+STRIP="${STRIP:-llvm-strip}"
 
 riscv_cflags="--target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -fpic -fPIE -mrelax"
 riscv_ldflags="-Wl,--emit-relocs -Wl,--no-relax"
@@ -57,13 +56,14 @@ picoalloc_build() {
 		--features corevm
 	mv -v target/riscv64emac-unknown-none-polkavm/release/libpicoalloc_native.a \
 		libpicoalloc_native.a
+    "$STRIP" libpicoalloc_native.a
 }
 
 musl_build() {
 	cd "$root"/libs/musl
 	mkdir -p src/malloc/mallocng
 	run env \
-		CFLAGS="$riscv_cflags -O3 -ggdb" \
+		CFLAGS="$riscv_cflags -O3 -g0 -fno-ident" \
 		CC="$CC" \
 		AR="$AR" \
 		RANLIB="$RANLIB" \
@@ -103,45 +103,6 @@ musl_install() {
 			"$root"/libs/musl/libclang_rt.builtins-riscv64.a \
 			"$sysroot"/lib/libclang_rt.builtins"$suffix".a
 	done
-}
-
-libunwind_install() {
-	rm -rf "$workdir"/libunwind
-	git clone --depth=1 --branch="$libunwind_tag" --quiet "$libunwind_url" "$workdir"/libunwind
-	cp "$root"/sdk/stdatomic.h "$sysroot"/include
-	cd "$workdir"/libunwind
-	autoreconf -vif
-	# Disable floating point registers.
-	sed -i -e '/.*error.*Unsupported RISC-V floating-point length.*/d' src/riscv/asm.h
-	sed -i -e 's/.*error.*Unsupported RISC-V floating-point size.*/typedef struct {} unw_tdep_fpreg_t;/' include/libunwind-riscv.h
-	sed -i -e 's/.*error.*FIXME.*/return 0;/' include/tdep-riscv/libunwind_i.h
-	sed -i -e '/.*fpval.*=.*/d' src/riscv/Ginit.c
-	sed -i -e 's/.*error.*Unsupported RISC-V floating point ABI.*/#define JB_MASK_SAVED (208>>3)\n#define JB_MASK (216>>3)/' include/tdep-riscv/jmpbuf.h
-	# Disable s2-s11 registers.
-	for i in 2 3 4 5 6 7 8 9 10 11; do
-		sed -i -e "/.*STORE s$i,.*/d" src/riscv/getcontext.S
-		sed -i -e "/.*LOAD s$i,.*/d" src/riscv/setcontext.S
-	done
-	# Disable a6-a7 registers.
-	for i in 6 7; do
-		sed -i -e "/.*STORE a$i,.*/d" src/riscv/getcontext.S
-		sed -i -e "/.*LOAD a$i,.*/d" src/riscv/setcontext.S
-	done
-	run env CC="$sysroot"/bin/polkavm-cc \
-		LLD="$sysroot"/bin/polkavm-cc \
-		CPPFLAGS="-D__linux__" \
-		./configure \
-		--prefix="$sysroot" \
-		--disable-shared \
-		--disable-tests \
-		--disable-coredump \
-		--disable-ptrace \
-		--disable-nto \
-		--disable-setjmp \
-		--host riscv64-pc-linux-musl
-	run make -j
-	run make install
-	cd "$root"
 }
 
 linux_install() {
@@ -200,17 +161,18 @@ EOF
 	# clang-18 and clang-19 on Ubuntu want libgcc
 	# clang-20 on Fedora wants libgcc_s
 	# busybox wants libgcc_eh
+    # rust wants libunwind
 	mkdir -p "$sysroot"/lib
-	for name in libgcc_s libgcc libgcc_eh; do
+	for name in libgcc_s libgcc libgcc_eh libunwind; do
 		touch "$sysroot"/lib/"$name".a
 	done
 	# CMake cross-compilation configuration.
-	cat >"$sysroot"/toolchain.cmake <<EOF
+	cat >"$sysroot"/toolchain.cmake <<'EOF'
 set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_C_COMPILER $sysroot/bin/polkavm-cc)
-set(CMAKE_CXX_COMPILER $sysroot/bin/polkavm-c++)
-set(CMAKE_FIND_ROOT_PATH $sysroot)
-set(CMAKE_SYSROOT $sysroot)
+set(CMAKE_C_COMPILER $ENV{COREVM_SYSROOT}/bin/polkavm-cc)
+set(CMAKE_CXX_COMPILER $ENV{COREVM_SYSROOT}/bin/polkavm-c++)
+set(CMAKE_FIND_ROOT_PATH $ENV{COREVM_SYSROOT})
+set(CMAKE_SYSROOT $ENV{COREVM_SYSROOT})
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
@@ -246,7 +208,7 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3" \
+		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3 -g0 -fno-ident" \
 		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -274,7 +236,7 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3" \
+		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3 -g0 -fno-ident" \
 		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -341,7 +303,6 @@ main() {
 	musl_build
 	musl_install
 	linux_install
-	libunwind_install
 	libcxx_install
 	rm -rf "$sysroot"/share/man
 	cat <<'EOF'
