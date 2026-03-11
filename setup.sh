@@ -14,7 +14,6 @@ CXX="${CXX:-clang++}"
 LLD="${LLD:-lld}"
 AR="${AR:-llvm-ar}"
 RANLIB="${RANLIB:-llvm-ranlib}"
-STRIP="${STRIP:-llvm-strip}"
 
 riscv_cflags="--target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -fpic -fPIE -mrelax"
 riscv_ldflags="-Wl,--emit-relocs -Wl,--no-relax"
@@ -47,7 +46,8 @@ picoalloc_build() {
 	cd "$workdir"/picoalloc
 	rm -rf target
 	target_json="$("$sysroot"/bin/polkatool get-target-json-path)"
-	RUSTC_BOOTSTRAP=1 cargo build \
+	RUSTC_BOOTSTRAP=1 RUSTFLAGS="-C debuginfo=0" \
+        cargo build \
 		-Zbuild-std=core,alloc \
 		--quiet \
 		--package picoalloc_native \
@@ -56,14 +56,13 @@ picoalloc_build() {
 		--features corevm
 	mv -v target/riscv64emac-unknown-none-polkavm/release/libpicoalloc_native.a \
 		libpicoalloc_native.a
-    "$STRIP" libpicoalloc_native.a
 }
 
 musl_build() {
 	cd "$root"/libs/musl
 	mkdir -p src/malloc/mallocng
 	run env \
-		CFLAGS="$riscv_cflags -O3 -g0 -fno-ident" \
+		CFLAGS="$riscv_cflags -O3 -g0 -fno-ident -ffile-prefix-map=$PWD=musl" \
 		CC="$CC" \
 		AR="$AR" \
 		RANLIB="$RANLIB" \
@@ -208,7 +207,7 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3 -g0 -fno-ident" \
+		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3 -g0 -fno-ident -ffile-prefix-map=$workdir/llvm/libcxx=libcxx" \
 		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -236,7 +235,7 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3 -g0 -fno-ident" \
+		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3 -g0 -fno-ident -ffile-prefix-map=$workdir/llvm/libcxxabi=libcxxabi" \
 		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
