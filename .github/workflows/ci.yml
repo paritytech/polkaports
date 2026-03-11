@@ -103,6 +103,10 @@ jobs:
     #  if: github.ref_type == 'tag'
     permissions:
       contents: write
+    env:
+      #  TODO
+      #VERSION: ${{ github.ref_name }}
+      VERSION: 0.2.0
     steps:
       - name: Download Linux archives
         uses: actions/download-artifact@v5
@@ -115,18 +119,18 @@ jobs:
       - name: Rename archives
         run: |
           ls -l
-          mv sysroot-Linux-riscv64emac.tar.zst sysroot-${{ github.ref_name }}-Linux-riscv64emac.tar.zst
-          mv sysroot-Darwin-riscv64emac.tar.zst sysroot-${{ github.ref_name }}-Darwin-riscv64emac.tar.zst
-          mv tools-Linux-x86_64.tar.zst tools-${{ github.ref_name }}-Linux-x86_64.tar.zst
-          mv tools-Darwin-arm64.tar.zst tools-${{ github.ref_name }}-Darwin-arm64.tar.zst
+          mv sysroot-Linux-riscv64emac.tar.zst sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
+          mv sysroot-Darwin-riscv64emac.tar.zst sysroot-${{ env.VERSION }}-Darwin-riscv64emac.tar.zst
+          mv tools-Linux-x86_64.tar.zst tools-${{ env.VERSION }}-Linux-x86_64.tar.zst
+          mv tools-Darwin-arm64.tar.zst tools-${{ env.VERSION }}-Darwin-arm64.tar.zst
       - name: Create release
         uses: actions/create-release@v1
         id: create_release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          tag_name: ${{ env.VERSION }}
+          release_name: Release ${{ env.VERSION }}
           draft: true
           prerelease: false
       - name: Upload system root (Linux)
@@ -135,8 +139,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: sysroot-${{ github.ref_name }}-Linux-riscv64emac.tar.zst
-          asset_name: sysroot-${{ github.ref_name }}-Linux-riscv64emac.tar.zst
+          asset_path: sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
+          asset_name: sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
           asset_content_type: application/zstd
       - name: Upload system root (Darwin)
         uses: actions/upload-release-asset@v1
@@ -144,8 +148,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: sysroot-${{ github.ref_name }}-Darwin-riscv64emac.tar.zst
-          asset_name: sysroot-${{ github.ref_name }}-Darwin-riscv64emac.tar.zst
+          asset_path: sysroot-${{ env.VERSION }}-Darwin-riscv64emac.tar.zst
+          asset_name: sysroot-${{ env.VERSION }}-Darwin-riscv64emac.tar.zst
           asset_content_type: application/zstd
       - name: Upload tools-Linux-x86_64.tar.zst
         uses: actions/upload-release-asset@v1
@@ -153,8 +157,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: tools-${{ github.ref_name }}-Linux-x86_64.tar.zst
-          asset_name: tools-${{ github.ref_name }}-Linux-x86_64.tar.zst
+          asset_path: tools-${{ env.VERSION }}-Linux-x86_64.tar.zst
+          asset_name: tools-${{ env.VERSION }}-Linux-x86_64.tar.zst
           asset_content_type: application/zstd
       - name: Upload tools-Darwin-arm64.tar.zst
         uses: actions/upload-release-asset@v1
@@ -162,6 +166,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: tools-${{ github.ref_name }}-Darwin-arm64.tar.zst
-          asset_name: tools-${{ github.ref_name }}-Darwin-arm64.tar.zst
+          asset_path: tools-${{ env.VERSION }}-Darwin-arm64.tar.zst
+          asset_name: tools-${{ env.VERSION }}-Darwin-arm64.tar.zst
           asset_content_type: application/zstd
