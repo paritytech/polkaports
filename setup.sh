@@ -17,6 +17,7 @@ RANLIB="${RANLIB:-llvm-ranlib}"
 
 riscv_cflags="--target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -fpic -fPIE -mrelax"
 riscv_ldflags="-Wl,--emit-relocs -Wl,--no-relax"
+rust_flags="-C debuginfo=0"
 
 run() {
 	set +e
@@ -34,11 +35,13 @@ cleanup() {
 }
 
 polkatool_install() {
-	cargo install --quiet --root "$sysroot" "$@" polkatool@$polkatool_version
+	env RUSTFLAGS="$rust_flags" \
+		cargo install --quiet --root "$sysroot" "$@" polkatool@$polkatool_version
 }
 
 jam_program_blob_install() {
-	cargo install --quiet --root "$sysroot" "$@" jam-program-blob@$jam_program_blob_version
+	env RUSTFLAGS="$rust_flags" \
+		cargo install --quiet --root "$sysroot" "$@" jam-program-blob@$jam_program_blob_version
 }
 
 picoalloc_build() {
@@ -46,8 +49,8 @@ picoalloc_build() {
 	cd "$workdir"/picoalloc
 	rm -rf target
 	target_json="$("$sysroot"/bin/polkatool get-target-json-path)"
-	RUSTC_BOOTSTRAP=1 RUSTFLAGS="-C debuginfo=0" \
-        cargo build \
+	RUSTC_BOOTSTRAP=1 RUSTFLAGS="$rust_flags" \
+		cargo build \
 		-Zbuild-std=core,alloc \
 		--quiet \
 		--package picoalloc_native \
@@ -160,7 +163,7 @@ EOF
 	# clang-18 and clang-19 on Ubuntu want libgcc
 	# clang-20 on Fedora wants libgcc_s
 	# busybox wants libgcc_eh
-    # rust wants libunwind
+	# rust wants libunwind
 	mkdir -p "$sysroot"/lib
 	for name in libgcc_s libgcc libgcc_eh libunwind; do
 		touch "$sysroot"/lib/"$name".a
