@@ -10,11 +10,11 @@ polkatool_version=0.29.0
 llvm_tag=llvmorg-22.1.0
 llvm_url=https://github.com/llvm/llvm-project
 
-CC="${CC:-clang}"
-CXX="${CXX:-clang++}"
-LLD="${LLD:-lld}"
-AR="${AR:-llvm-ar}"
-RANLIB="${RANLIB:-llvm-ranlib}"
+CC=clang
+CXX=clang++
+LLD=lld
+AR=llvm-ar
+RANLIB=llvm-ranlib
 
 riscv_cflags="--target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -fpic -fPIE -mrelax"
 riscv_ldflags="-Wl,--emit-relocs -Wl,--no-relax"
@@ -153,36 +153,39 @@ linux_install() {
 sysroot_init() {
 	rm -rf "$sysroot"/bin
 	mkdir -p "$sysroot"/bin
-	cat >"$sysroot"/bin/polkavm-cc <<EOF
+	export COREVM_SYSROOT="$sysroot"
+	cat >"$sysroot"/bin/polkavm-cc <<'EOF'
 #!/bin/sh
 suffix=
-for x in "\$@"; do
-	case "\$x" in
+for x in "$@"; do
+	case "$x" in
 	-nostdlib) suffix=-nostdlib ;;
 	*) ;;
 	esac
 done
-exec "$CC" --config=$sysroot/clang\$suffix.cfg "\$@"
+exec "${COREVM_CC:-clang}" --config="$COREVM_SYSROOT"/clang$suffix.cfg "$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-cc
-	cat >"$sysroot"/bin/polkavm-c++ <<EOF
+	cat >"$sysroot"/bin/polkavm-c++ <<'EOF'
 #!/bin/sh
 suffix=
-for x in "\$@"; do
-	case "\$x" in
+for x in "$@"; do
+	case "$x" in
 	-nostdlib) suffix=-nostdlib ;;
 	*) ;;
 	esac
 done
-exec "$CXX" --config=$sysroot/clang++\$suffix.cfg "\$@"
+exec "${COREVM_CXX:-clang++}" --config="$COREVM_SYSROOT"/clang++$suffix.cfg "$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
-	cat >"$sysroot"/bin/polkavm-lld <<EOF
+	cat >"$sysroot"/bin/polkavm-lld <<'EOF'
 #!/bin/sh
-exec "$LLD" "\$@" --sysroot="$sysroot" -L$sysroot/lib \
-	$sysroot/lib/Scrt1.o \
-	$sysroot/lib/crti.o \
-	$sysroot/lib/crtn.o
+exec "${COREVM_LLD:-lld}" "$@" \
+    --sysroot="$COREVM_SYSROOT" \
+    -L"$COREVM_SYSROOT"/lib \
+    "$COREVM_SYSROOT"/lib/Scrt1.o \
+    "$COREVM_SYSROOT"/lib/crti.o \
+    "$COREVM_SYSROOT"/lib/crtn.o
 EOF
 	chmod +x "$sysroot"/bin/polkavm-lld
 	ln -f "$root"/sdk/clang.cfg "$sysroot"/
@@ -198,12 +201,12 @@ EOF
 		touch "$sysroot"/lib/"$name".a
 	done
 	# CMake cross-compilation configuration.
-	cat >"$sysroot"/toolchain.cmake <<EOF
+	cat >"$sysroot"/toolchain.cmake <<'EOF'
 set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_C_COMPILER $sysroot/bin/polkavm-cc)
-set(CMAKE_CXX_COMPILER $sysroot/bin/polkavm-c++)
-set(CMAKE_FIND_ROOT_PATH $sysroot)
-set(CMAKE_SYSROOT $sysroot)
+set(CMAKE_C_COMPILER $ENV{COREVM_SYSROOT}/bin/polkavm-cc)
+set(CMAKE_CXX_COMPILER $ENV{COREVM_SYSROOT}/bin/polkavm-c++)
+set(CMAKE_FIND_ROOT_PATH $ENV{COREVM_SYSROOT})
+set(CMAKE_SYSROOT $ENV{COREVM_SYSROOT})
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
