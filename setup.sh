@@ -19,6 +19,11 @@ riscv_cflags="--target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmo
 riscv_ldflags="-Wl,--emit-relocs -Wl,--no-relax"
 rust_flags="-C debuginfo=0"
 
+# Flags that improve reproducibility.
+repro_cflags="-g0 -fno-ident"
+repro_cxxflags="$repro_cflags"
+repro_rustflags="-C debuginfo=0"
+
 run() {
 	set +e
 	"$@" >"$workdir"/output 2>&1
@@ -35,12 +40,12 @@ cleanup() {
 }
 
 polkatool_install() {
-	env RUSTFLAGS="$rust_flags" \
+	env RUSTFLAGS="$repro_rustflags" \
 		cargo install --quiet --root "$sysroot" "$@" polkatool@$polkatool_version
 }
 
 jam_program_blob_install() {
-	env RUSTFLAGS="$rust_flags" \
+	env RUSTFLAGS="$repro_rustflags" \
 		cargo install --quiet --root "$sysroot" "$@" jam-program-blob@$jam_program_blob_version
 }
 
@@ -49,7 +54,7 @@ picoalloc_build() {
 	cd "$workdir"/picoalloc
 	rm -rf target
 	target_json="$("$sysroot"/bin/polkatool get-target-json-path)"
-	RUSTC_BOOTSTRAP=1 RUSTFLAGS="$rust_flags" \
+	RUSTC_BOOTSTRAP=1 RUSTFLAGS="$repro_rustflags" \
 		cargo build \
 		-Zbuild-std=core,alloc \
 		--quiet \
@@ -65,7 +70,7 @@ musl_build() {
 	cd "$root"/libs/musl
 	mkdir -p src/malloc/mallocng
 	run env \
-		CFLAGS="$riscv_cflags -O3 -g0 -fno-ident -ffile-prefix-map=$PWD=musl" \
+		CFLAGS="$riscv_cflags -O3 $repro_cflags -ffile-prefix-map=$PWD=musl" \
 		CC="$CC" \
 		AR="$AR" \
 		RANLIB="$RANLIB" \
@@ -207,7 +212,7 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3 -g0 -fno-ident -ffile-prefix-map=$workdir/llvm/libcxx=libcxx" \
+		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3 $repro_cxxflags -ffile-prefix-map=$workdir/llvm/libcxx=libcxx" \
 		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -235,7 +240,7 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3 -g0 -fno-ident -ffile-prefix-map=$workdir/llvm/libcxxabi=libcxxabi" \
+		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3 $repro_cxxflags -ffile-prefix-map=$workdir/llvm/libcxxabi=libcxxabi" \
 		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
