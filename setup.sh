@@ -9,11 +9,11 @@ jam_program_blob_version=0.1.26
 llvm_tag=llvmorg-22.1.0
 llvm_url=https://github.com/llvm/llvm-project
 
-CC="${CC:-clang}"
-CXX="${CXX:-clang++}"
-LLD="${LLD:-lld}"
-AR="${AR:-llvm-ar}"
-RANLIB="${RANLIB:-llvm-ranlib}"
+CC=clang
+CXX=clang++
+LLD=lld
+AR=llvm-ar
+RANLIB=llvm-ranlib
 
 riscv_cflags="--target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -fpic -fPIE -mrelax"
 riscv_ldflags="-Wl,--emit-relocs -Wl,--no-relax"
@@ -118,9 +118,6 @@ sysroot_init() {
 	rm -rf "$sysroot"/bin
 	mkdir -p "$sysroot"/bin
 	export COREVM_SYSROOT="$sysroot"
-	export COREVM_CC="$CC"
-	export COREVM_CXX="$CXX"
-	export COREVM_LLD="$LLD"
 	cat >"$sysroot"/bin/polkavm-cc <<'EOF'
 #!/bin/sh
 suffix=
@@ -130,7 +127,7 @@ for x in "$@"; do
 	*) ;;
 	esac
 done
-exec "$COREVM_CC" --config="$COREVM_SYSROOT"/clang$suffix.cfg "$@"
+exec "${COREVM_CC:-clang}" --config="$COREVM_SYSROOT"/clang$suffix.cfg "$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-cc
 	cat >"$sysroot"/bin/polkavm-c++ <<'EOF'
@@ -142,12 +139,12 @@ for x in "$@"; do
 	*) ;;
 	esac
 done
-exec "$COREVM_CXX" --config="$COREVM_SYSROOT"/clang++$suffix.cfg "$@"
+exec "${COREVM_CXX:-clang++}" --config="$COREVM_SYSROOT"/clang++$suffix.cfg "$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
 	cat >"$sysroot"/bin/polkavm-lld <<'EOF'
 #!/bin/sh
-exec "$COREVM_LLD" "$@" \
+exec "${COREVM_LLD:-lld}" "$@" \
     --sysroot="$COREVM_SYSROOT" \
     -L"$COREVM_SYSROOT"/lib \
     "$COREVM_SYSROOT"/lib/Scrt1.o \
