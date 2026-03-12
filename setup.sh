@@ -7,6 +7,7 @@ libunwind_url=https://github.com/libunwind/libunwind
 picoalloc_tag=v5.2.0
 picoalloc_url=https://github.com/koute/picoalloc
 polkatool_version=0.29.0
+jam_program_blob_version=0.1.26
 llvm_tag=llvmorg-22.1.0
 llvm_url=https://github.com/llvm/llvm-project
 
@@ -18,6 +19,11 @@ RANLIB=llvm-ranlib
 
 riscv_cflags="--target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -fpic -fPIE -mrelax"
 riscv_ldflags="-Wl,--emit-relocs -Wl,--no-relax"
+
+# Flags that improve reproducibility.
+repro_cflags="-g0 -fno-ident"
+repro_cxxflags="$repro_cflags"
+repro_rustflags="-C debuginfo=0"
 
 run() {
 	set +e
@@ -35,11 +41,13 @@ cleanup() {
 }
 
 polkatool_install() {
-	cargo install --quiet --root "$sysroot" polkatool@$polkatool_version
+	env RUSTFLAGS="$repro_rustflags" \
+		cargo install --quiet --root "$sysroot" polkatool@$polkatool_version
 }
 
 jam_program_blob_install() {
-	cargo install --quiet --root "$sysroot" jam-program-blob
+	env RUSTFLAGS="$repro_rustflags" \
+		cargo install --quiet --root "$sysroot" jam-program-blob@$jam_program_blob_version
 }
 
 picoalloc_build() {
@@ -47,7 +55,8 @@ picoalloc_build() {
 	cd "$workdir"/picoalloc
 	rm -rf target
 	target_json="$("$sysroot"/bin/polkatool get-target-json-path)"
-	RUSTC_BOOTSTRAP=1 cargo build \
+	RUSTC_BOOTSTRAP=1 RUSTFLAGS="$repro_rustflags" \
+		cargo build \
 		-Zbuild-std=core,alloc \
 		--quiet \
 		--package picoalloc_native \
@@ -62,7 +71,7 @@ musl_build() {
 	cd "$root"/libs/musl
 	mkdir -p src/malloc/mallocng
 	run env \
-		CFLAGS="-Wno-shift-op-parentheses -Wno-unused-command-line-argument $riscv_cflags -ggdb" \
+		CFLAGS="$riscv_cflags -O3 $repro_cflags -ffile-prefix-map=$PWD=musl" \
 		CC="$CC" \
 		AR="$AR" \
 		RANLIB="$RANLIB" \
@@ -71,7 +80,7 @@ musl_build() {
 		./configure \
 		--prefix="$sysroot" \
 		--target=riscv64 \
-		--enable-wrapper=clang \
+		--disable-wrapper \
 		--disable-shared
 	run make clean
 	run make -j
@@ -242,7 +251,7 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3" \
+		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3 $repro_cxxflags -ffile-prefix-map=$workdir/llvm/libcxx=libcxx" \
 		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -270,7 +279,7 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3" \
+		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3 $repro_cxxflags -ffile-prefix-map=$workdir/llvm/libcxxabi=libcxxabi" \
 		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
