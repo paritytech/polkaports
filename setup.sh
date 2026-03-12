@@ -43,11 +43,7 @@ jam_program_blob_install() {
 }
 
 picoalloc_build() {
-	suffix="$1"
-	shift
-	if ! test -d "$workdir"/picoalloc; then
-		git clone --depth=1 --branch="$picoalloc_tag" --quiet "$picoalloc_url" "$workdir"/picoalloc
-	fi
+	git clone --depth=1 --branch="$picoalloc_tag" --quiet "$picoalloc_url" "$workdir"/picoalloc
 	cd "$workdir"/picoalloc
 	rm -rf target
 	target_json="$("$sysroot"/bin/polkatool get-target-json-path)"
@@ -57,9 +53,9 @@ picoalloc_build() {
 		--package picoalloc_native \
 		--release \
 		--target="$target_json" \
-		"$@"
+		--features corevm
 	mv -v target/riscv64emac-unknown-none-polkavm/release/libpicoalloc_native.a \
-		libpicoalloc_native"$suffix".a
+		libpicoalloc_native.a
 }
 
 musl_build() {
@@ -84,10 +80,7 @@ musl_build() {
 
 musl_install() {
 	# Install CoreVM-specific headers.
-	case "$suffix" in
-	polkavm) ;;
-	corevm) ln -f "$root"/sdk/corevm_guest.h "$sysroot"/include/ ;;
-	esac
+	ln -f "$root"/sdk/corevm_guest.h "$sysroot"/include/
 	cp "$root"/libs/musl/arch/riscv64/polkavm_guest.h "$sysroot"/include/
 
 	mkdir -p "$sysroot"/lib
@@ -98,16 +91,16 @@ musl_install() {
 	rm -rf "$workdir"/repack
 	mkdir -p "$workdir"/repack
 	cd "$workdir"/repack
-	"$AR" x "$workdir"/picoalloc/libpicoalloc_native"$suffix".a
+	"$AR" x "$workdir"/picoalloc/libpicoalloc_native.a
 	cp "$root"/libs/musl/lib/libc.a .
 	"$AR" r libc.a picoalloc*.o
 	# Overwrite libc.a in the sysroot
 	cp libc.a "$sysroot"/lib
 
-	for another_suffix in "" -riscv64; do
+	for suffix in "" -riscv64; do
 		ln -f \
 			"$root"/libs/musl/libclang_rt.builtins-riscv64.a \
-			"$sysroot"/lib/libclang_rt.builtins"$another_suffix".a
+			"$sysroot"/lib/libclang_rt.builtins"$suffix".a
 	done
 }
 
@@ -151,9 +144,7 @@ libunwind_install() {
 }
 
 linux_install() {
-	if ! test -d "$workdir"/linux; then
-		git clone --depth=1 --branch="$linux_tag" "$linux_url" "$workdir"/linux
-	fi
+	git clone --depth=1 --branch="$linux_tag" "$linux_url" "$workdir"/linux
 	cd "$workdir"/linux
 	run make headers_install ARCH=riscv CONFIG_ARCH_RV64I=y INSTALL_HDR_PATH="$sysroot"
 	cd "$root"
@@ -198,9 +189,7 @@ EOF
 	ln -f "$root"/sdk/clang-nostdlib.cfg "$sysroot"/
 	ln -f "$root"/sdk/clang++.cfg "$sysroot"/
 	ln -f "$root"/sdk/clang++-nostdlib.cfg "$sysroot"/
-	sed -e "s|@VENDOR@|$suffix|g" \
-		<"$root"/sdk/riscv64emac-template-linux-musl.json \
-		>"$sysroot"/riscv64emac-"$suffix"-linux-musl.json
+	ln -f "$root"/sdk/riscv64emac-corevm-linux-musl.json "$sysroot"/
 	# clang-18 and clang-19 on Ubuntu want libgcc
 	# clang-20 on Fedora wants libgcc_s
 	# busybox wants libgcc_eh
@@ -208,7 +197,7 @@ EOF
 	for name in libgcc_s libgcc libgcc_eh; do
 		touch "$sysroot"/lib/"$name".a
 	done
-    # CMake cross-compilation configuration.
+	# CMake cross-compilation configuration.
 	cat >"$sysroot"/toolchain.cmake <<EOF
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_C_COMPILER $sysroot/bin/polkavm-cc)
@@ -225,7 +214,7 @@ EOF
 }
 
 libcxx_install() {
-    # Custom config just for libcxx.
+	# Custom config just for libcxx.
 	cat >"$workdir"/libcxx.cmake <<EOF
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_C_COMPILER $CC)
@@ -239,9 +228,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_C_COMPILER_WORKS 1)
 set(CMAKE_CXX_COMPILER_WORKS 1)
 EOF
-	if ! test -d "$workdir"/llvm; then
-		git clone --depth=1 --branch="$llvm_tag" "$llvm_url" "$workdir"/llvm
-	fi
+	git clone --depth=1 --branch="$llvm_tag" "$llvm_url" "$workdir"/llvm
 	# Configure libcxx first.
 	cd "$workdir"/llvm/libcxx
 	# Fix script permissions.
@@ -313,9 +300,8 @@ EOF
 run_single() {
 	case "$1" in
 	musl)
-		suffix=corevm
-		sysroot="$root"/sysroot-"$suffix"
-		picoalloc_build corevm --features corevm
+		sysroot="$root"/sysroot
+		picoalloc_build
 		musl_build
 		musl_install
 		;;
@@ -335,29 +321,23 @@ main() {
 		run_single "$1"
 		exit 0
 	fi
-	for suffix in polkavm corevm; do
-		sysroot="$root"/sysroot-"$suffix"
-		sysroot_init
-		polkatool_install
-		jam_program_blob_install
-		case "$suffix" in
-		polkavm) picoalloc_build polkavm ;;
-		corevm) picoalloc_build corevm --features corevm ;;
-		esac
-		musl_build
-		musl_install
-		linux_install
-		libunwind_install
-		libcxx_install
-	done
+	sysroot="$root"/sysroot
+	sysroot_init
+	polkatool_install
+	jam_program_blob_install
+	picoalloc_build
+	musl_build
+	musl_install
+	linux_install
+	libunwind_install
+	libcxx_install
 	cat <<'EOF'
 
 Setup finished!
 
-Type one of the following commands to activate the toolchain.
+Type the following command to activate the toolchain.
 
-    . ./activate.sh corevm
-    . ./activate.sh polkavm
+    . ./activate.sh
 
 EOF
 }

@@ -1,14 +1,9 @@
 #!/bin/sh
-
-suffix="$1"
-case "$suffix" in
-polkavm | corevm) ;;
+export COREVM_SYSROOT="$PWD"/sysroot
+# Prepend to PATH.
+case ":$PATH:" in
+*:"$COREVM_SYSROOT"/bin:*) ;;
 *)
-	printf "usage: . ./activate.sh corevm|polkavm\n" >&2
-	return 1
+	export PATH="$COREVM_SYSROOT"/bin:"$PATH"
 	;;
 esac
-
-export POLKAPORTS_SUFFIX="$suffix"
-export POLKAPORTS_SYSROOT="$PWD"/sysroot-"$suffix"
-export PATH="$POLKAPORTS_SYSROOT"/bin:"$PATH"

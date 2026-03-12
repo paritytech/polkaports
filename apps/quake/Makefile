@@ -68,16 +68,16 @@ QUAKE_OBJS = \
 	$(OUTPUT)/pr_cmds.o \
 	$(OUTPUT)/pr_edict.o \
 	$(OUTPUT)/pr_exec.o \
-	$(OUTPUT)/vid_$(POLKAPORTS_SUFFIX).o
+	$(OUTPUT)/vid_corevm.o
 
 .PHONY: all clean
 
-all: $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX)
+all: $(OUTPUT)/quake.corevm
 
-$(OUTPUT)/quake.polkavm: $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf
+$(OUTPUT)/quake.polkavm: $(OUTPUT)/quake.corevm.elf
 	polkatool link $< --output $@ --min-stack-size $(MIN_STACK_SIZE)
 
-$(OUTPUT)/quake.corevm: $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf
+$(OUTPUT)/quake.corevm: $(OUTPUT)/quake.corevm.elf
 	polkatool link $< --output $@.tmp --min-stack-size $(MIN_STACK_SIZE)
 	jam-blob set-meta \
 		--name PolkaQuake \
@@ -87,7 +87,7 @@ $(OUTPUT)/quake.corevm: $(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf
 		$@.tmp
 	mv $@.tmp $@
 
-$(OUTPUT)/quake.$(POLKAPORTS_SUFFIX).elf: $(QUAKE_OBJS)
+$(OUTPUT)/quake.corevm.elf: $(QUAKE_OBJS)
 	$(CC) -v $(CFLAGS) $(LDFLAGS) -o $@ $+
 
 $(OUTPUT)/%.o: %.c
