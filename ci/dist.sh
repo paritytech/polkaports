@@ -11,13 +11,13 @@ main() {
 	trap cleanup EXIT
 	root="$PWD"
 	set_permissions
-    create_sysroot_archive
+	create_sysroot_archive
 	create_tools_archive
 	b2sum "$SYSROOT_FILENAME" "$TOOLS_FILENAME"
 }
 
 set_permissions() {
-    # Reproducible permissions.
+	# Reproducible permissions.
 	find sysroot -type f -exec chmod 0644 \{\} \;
 	find sysroot -type l -exec chmod --no-dereference 0777 \{\} \;
 	find sysroot/bin -type f -exec chmod 0755 \{\} \;
@@ -25,11 +25,10 @@ set_permissions() {
 }
 
 create_sysroot_archive() {
-    # TODO
-    #if test "$KERNEL" != Linux; then
-    #    # System root shouldn't depend on host OS.
-    #    return
-    #fi
+	if test "$KERNEL" != Linux; then
+		# System root shouldn't depend on host OS.
+		return
+	fi
 	# Resulting archive should be reproducible between CI job runs.
 	cd sysroot
 	{

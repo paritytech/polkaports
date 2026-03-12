@@ -92,9 +92,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-archives
-          path: |
-            sysroot-Darwin-riscv64emac.tar.zst
-            tools-Darwin-arm64.tar.zst
+          path: tools-Darwin-arm64.tar.zst
           compression-level: 0
           if-no-files-found: error
           retention-days: 1
@@ -152,7 +150,6 @@ jobs:
         run: |
           ls -l
           mv sysroot-Linux-riscv64emac.tar.zst sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
-          mv sysroot-Darwin-riscv64emac.tar.zst sysroot-${{ env.VERSION }}-Darwin-riscv64emac.tar.zst
           mv tools-Linux-x86_64.tar.zst tools-${{ env.VERSION }}-Linux-x86_64.tar.zst
           mv tools-Darwin-arm64.tar.zst tools-${{ env.VERSION }}-Darwin-arm64.tar.zst
       - name: Create release
@@ -165,7 +162,7 @@ jobs:
           release_name: Release ${{ env.VERSION }}
           draft: true
           prerelease: false
-      - name: Upload system root (Linux)
+      - name: Upload system root
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -173,15 +170,6 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
           asset_name: sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
-          asset_content_type: application/zstd
-      - name: Upload system root (Darwin)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: sysroot-${{ env.VERSION }}-Darwin-riscv64emac.tar.zst
-          asset_name: sysroot-${{ env.VERSION }}-Darwin-riscv64emac.tar.zst
           asset_content_type: application/zstd
       - name: Upload tools-Linux-x86_64.tar.zst
         uses: actions/upload-release-asset@v1
