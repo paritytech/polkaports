@@ -17,7 +17,6 @@ RANLIB=llvm-ranlib
 
 riscv_cflags="--target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -fpic -fPIE -mrelax"
 riscv_ldflags="-Wl,--emit-relocs -Wl,--no-relax"
-rust_flags="-C debuginfo=0"
 
 # Flags that improve reproducibility.
 repro_cflags="-g0 -fno-ident"

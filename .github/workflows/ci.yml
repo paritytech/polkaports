@@ -50,6 +50,11 @@ jobs:
           rustup default stable
       - name: Check that setup script works
         run: ./setup.sh
+      - name: Check that sysroot is reproducible
+        run: |
+          mv sysroot sysroot.old
+          ./setup.sh
+          ./ci/check-reproducible.sh sysroot.old sysroot
       - name: Check that our tools work
         run: ./ci/apps.sh
       - name: Create distribution archive
