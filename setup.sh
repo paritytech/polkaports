@@ -154,9 +154,6 @@ sysroot_init() {
 	rm -rf "$sysroot"/bin
 	mkdir -p "$sysroot"/bin
 	export COREVM_SYSROOT="$sysroot"
-	export COREVM_CC="$CC"
-	export COREVM_CXX="$CXX"
-	export COREVM_LLD="$LLD"
 	cat >"$sysroot"/bin/polkavm-cc <<'EOF'
 #!/bin/sh
 suffix=
@@ -166,7 +163,7 @@ for x in "$@"; do
 	*) ;;
 	esac
 done
-exec "$COREVM_CC" --config="$COREVM_SYSROOT"/clang$suffix.cfg "$@"
+exec "${COREVM_CC:-clang}" --config="$COREVM_SYSROOT"/clang$suffix.cfg "$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-cc
 	cat >"$sysroot"/bin/polkavm-c++ <<'EOF'
@@ -178,12 +175,12 @@ for x in "$@"; do
 	*) ;;
 	esac
 done
-exec "$COREVM_CXX" --config="$COREVM_SYSROOT"/clang++$suffix.cfg "$@"
+exec "${COREVM_CXX:-clang++}" --config="$COREVM_SYSROOT"/clang++$suffix.cfg "$@"
 EOF
 	chmod +x "$sysroot"/bin/polkavm-c++
 	cat >"$sysroot"/bin/polkavm-lld <<'EOF'
 #!/bin/sh
-exec "$COREVM_LLD" "$@" \
+exec "${COREVM_LLD:-lld}" "$@" \
     --sysroot="$COREVM_SYSROOT" \
     -L"$COREVM_SYSROOT"/lib \
     "$COREVM_SYSROOT"/lib/Scrt1.o \
