@@ -2,11 +2,10 @@
 
 linux_tag=v6.15
 linux_url=https://github.com/torvalds/linux
-libunwind_tag=v1.8.2
-libunwind_url=https://github.com/libunwind/libunwind
 picoalloc_tag=v5.2.0
 picoalloc_url=https://github.com/koute/picoalloc
 polkatool_version=0.29.0
+jam_program_blob_version=0.1.26
 llvm_tag=llvmorg-22.1.0
 llvm_url=https://github.com/llvm/llvm-project
 
@@ -18,6 +17,11 @@ RANLIB=llvm-ranlib
 
 riscv_cflags="--target=riscv64-unknown-none-elf -march=rv64emac_zbb_xtheadcondmov -mabi=lp64e -fpic -fPIE -mrelax"
 riscv_ldflags="-Wl,--emit-relocs -Wl,--no-relax"
+
+# Flags that improve reproducibility.
+repro_cflags="-g0 -fno-ident"
+repro_cxxflags="$repro_cflags"
+repro_rustflags="-C debuginfo=0"
 
 run() {
 	set +e
@@ -35,11 +39,13 @@ cleanup() {
 }
 
 polkatool_install() {
-	cargo install --quiet --root "$sysroot" polkatool@$polkatool_version
+	env RUSTFLAGS="$repro_rustflags" \
+		cargo install --quiet --root "$sysroot" polkatool@$polkatool_version
 }
 
 jam_program_blob_install() {
-	cargo install --quiet --root "$sysroot" jam-program-blob
+	env RUSTFLAGS="$repro_rustflags" \
+		cargo install --quiet --root "$sysroot" jam-program-blob@$jam_program_blob_version
 }
 
 picoalloc_build() {
@@ -47,7 +53,8 @@ picoalloc_build() {
 	cd "$workdir"/picoalloc
 	rm -rf target
 	target_json="$("$sysroot"/bin/polkatool get-target-json-path)"
-	RUSTC_BOOTSTRAP=1 cargo build \
+	RUSTC_BOOTSTRAP=1 RUSTFLAGS="$repro_rustflags" \
+		cargo build \
 		-Zbuild-std=core,alloc \
 		--quiet \
 		--package picoalloc_native \
@@ -62,7 +69,7 @@ musl_build() {
 	cd "$root"/libs/musl
 	mkdir -p src/malloc/mallocng
 	run env \
-		CFLAGS="-Wno-shift-op-parentheses -Wno-unused-command-line-argument $riscv_cflags -ggdb" \
+		CFLAGS="$riscv_cflags -O3 $repro_cflags -ffile-prefix-map=$PWD=musl" \
 		CC="$CC" \
 		AR="$AR" \
 		RANLIB="$RANLIB" \
@@ -71,7 +78,7 @@ musl_build() {
 		./configure \
 		--prefix="$sysroot" \
 		--target=riscv64 \
-		--enable-wrapper=clang \
+		--disable-wrapper \
 		--disable-shared
 	run make clean
 	run make -j
@@ -102,45 +109,6 @@ musl_install() {
 			"$root"/libs/musl/libclang_rt.builtins-riscv64.a \
 			"$sysroot"/lib/libclang_rt.builtins"$suffix".a
 	done
-}
-
-libunwind_install() {
-	rm -rf "$workdir"/libunwind
-	git clone --depth=1 --branch="$libunwind_tag" --quiet "$libunwind_url" "$workdir"/libunwind
-	cp "$root"/sdk/stdatomic.h "$sysroot"/include
-	cd "$workdir"/libunwind
-	autoreconf -vif
-	# Disable floating point registers.
-	sed -i -e '/.*error.*Unsupported RISC-V floating-point length.*/d' src/riscv/asm.h
-	sed -i -e 's/.*error.*Unsupported RISC-V floating-point size.*/typedef struct {} unw_tdep_fpreg_t;/' include/libunwind-riscv.h
-	sed -i -e 's/.*error.*FIXME.*/return 0;/' include/tdep-riscv/libunwind_i.h
-	sed -i -e '/.*fpval.*=.*/d' src/riscv/Ginit.c
-	sed -i -e 's/.*error.*Unsupported RISC-V floating point ABI.*/#define JB_MASK_SAVED (208>>3)\n#define JB_MASK (216>>3)/' include/tdep-riscv/jmpbuf.h
-	# Disable s2-s11 registers.
-	for i in 2 3 4 5 6 7 8 9 10 11; do
-		sed -i -e "/.*STORE s$i,.*/d" src/riscv/getcontext.S
-		sed -i -e "/.*LOAD s$i,.*/d" src/riscv/setcontext.S
-	done
-	# Disable a6-a7 registers.
-	for i in 6 7; do
-		sed -i -e "/.*STORE a$i,.*/d" src/riscv/getcontext.S
-		sed -i -e "/.*LOAD a$i,.*/d" src/riscv/setcontext.S
-	done
-	run env CC="$sysroot"/bin/polkavm-cc \
-		LLD="$sysroot"/bin/polkavm-cc \
-		CPPFLAGS="-D__linux__" \
-		./configure \
-		--prefix="$sysroot" \
-		--disable-shared \
-		--disable-tests \
-		--disable-coredump \
-		--disable-ptrace \
-		--disable-nto \
-		--disable-setjmp \
-		--host riscv64-pc-linux-musl
-	run make -j
-	run make install
-	cd "$root"
 }
 
 linux_install() {
@@ -196,8 +164,9 @@ EOF
 	# clang-18 and clang-19 on Ubuntu want libgcc
 	# clang-20 on Fedora wants libgcc_s
 	# busybox wants libgcc_eh
+	# rust wants libunwind
 	mkdir -p "$sysroot"/lib
-	for name in libgcc_s libgcc libgcc_eh; do
+	for name in libgcc_s libgcc libgcc_eh libunwind; do
 		touch "$sysroot"/lib/"$name".a
 	done
 	# CMake cross-compilation configuration.
@@ -242,7 +211,7 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3" \
+		CXXFLAGS="$riscv_cflags --sysroot=$sysroot -I$sysroot/include/c++/v1 -D_GNU_SOURCE -O3 $repro_cxxflags -ffile-prefix-map=$workdir/llvm/libcxx=libcxx" \
 		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -270,7 +239,7 @@ EOF
 	mkdir build
 	cd build
 	run env \
-		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3" \
+		CXXFLAGS="$riscv_cflags -I$workdir/llvm/libcxx/build/include/c++/v1 -I$workdir/llvm/libcxx/include -D_GNU_SOURCE -O3 $repro_cxxflags -ffile-prefix-map=$workdir/llvm/libcxxabi=libcxxabi" \
 		LDFLAGS="$riscv_ldflags -nostdlib" \
 		cmake \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -332,8 +301,8 @@ main() {
 	musl_build
 	musl_install
 	linux_install
-	libunwind_install
 	libcxx_install
+	rm -rf "$sysroot"/share/man
 	cat <<'EOF'
 
 Setup finished!
