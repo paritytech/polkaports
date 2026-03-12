@@ -29,7 +29,7 @@
   },
   "os": "linux",
   "env": "musl",
-  "vendor": "@VENDOR@",
+  "vendor": "corevm",
   "dynamic-linking": true,
   "only-cdylib": true,
   "relro-level": "full",
