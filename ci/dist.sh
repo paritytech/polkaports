@@ -13,7 +13,10 @@ main() {
 	set_permissions
 	create_sysroot_archive
 	create_tools_archive
-	b2sum "$SYSROOT_FILENAME" "$TOOLS_FILENAME"
+	case "$kernel" in
+	Linux) b2sum "$SYSROOT_FILENAME" "$TOOLS_FILENAME" ;;
+	*) b2sum "$TOOLS_FILENAME" ;;
+	esac
 }
 
 set_permissions() {
