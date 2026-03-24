@@ -159,6 +159,7 @@ jobs:
           mv sysroot-Linux-riscv64emac.tar.zst sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
           mv tools-Linux-x86_64.tar.zst tools-${{ env.VERSION }}-Linux-x86_64.tar.zst
           mv tools-Darwin-arm64.tar.zst tools-${{ env.VERSION }}-Darwin-arm64.tar.zst
+          b2sum *.tar.zst | env LC_ALL=C sort
       - name: Create release
         uses: actions/create-release@v1
         id: create_release

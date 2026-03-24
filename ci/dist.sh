@@ -36,10 +36,10 @@ create_sysroot_archive() {
 	cd sysroot
 	{
 		# We only care about non-hidden files, directories and symbolic links.
-		find * -type f -not -name '.*' -print0
-		find * -type d -not -name '.*' -print0
-		find * -type l -not -name '.*' -print0
-	} | grep -zv '^bin' | env LC_ALL=C sort --zero-terminated >"$workdir"/files
+		find . -type f -not -name '.*' -print0
+		find . -type d -not -name '.*' -print0
+		find . -type l -not -name '.*' -print0
+	} | grep -zv '^bin' | env LC_ALL=C sort --unique --zero-terminated >"$workdir"/files
 	create_tar_archive "$workdir"/files "$root"/"$SYSROOT_FILENAME"
 	cd "$root"
 }
@@ -49,10 +49,10 @@ create_tools_archive() {
 	cd sysroot/bin
 	{
 		# We only care about non-hidden files, directories and symbolic links.
-		find * -type f -not -name '.*' -print0
-		find * -type d -not -name '.*' -print0
-		find * -type l -not -name '.*' -print0
-	} | env LC_ALL=C sort --zero-terminated >"$workdir"/files
+		find . -type f -not -name '.*' -print0
+		find . -type d -not -name '.*' -print0
+		find . -type l -not -name '.*' -print0
+	} | env LC_ALL=C sort --unique --zero-terminated >"$workdir"/files
 	create_tar_archive "$workdir"/files "$root"/"$TOOLS_FILENAME"
 	cd "$root"
 }
@@ -64,6 +64,7 @@ create_tar_archive() {
 		--numeric-owner \
 		--owner=0 \
 		--group=0 \
+		--hard-dereference \
 		--null \
 		--files-from="$1" \
 		--file=- |
