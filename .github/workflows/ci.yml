@@ -16,6 +16,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_VERSION: 1.94.0
 
 jobs:
   rust:
@@ -35,32 +36,163 @@ jobs:
     name: Run setup script on Linux
     timeout-minutes: 20
     runs-on: ubuntu-24.04
+    env:
+      TOOLS_RUST_TARGET: x86_64-unknown-linux-musl
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Install dependencies
         run: ./ci/apt.sh
-      - name: Install rust-src
-        run: rustup component add rust-src
+      - name: Install Rust toolchain
+        run: |
+          rustup install --target x86_64-unknown-linux-gnu,x86_64-unknown-linux-musl ${{ env.RUST_VERSION }}
+          rustup default ${{ env.RUST_VERSION }}-x86_64-unknown-linux-gnu
+          rustup component add rust-src
       - name: Check that setup script works
         run: ./setup.sh
+      - name: Check that sysroot is reproducible
+        run: |
+          mv sysroot sysroot.old
+          ./setup.sh
+          ./ci/check-reproducible.sh sysroot.old sysroot
       - name: Check that our tools work
         run: ./ci/apps.sh
+      - name: Create distribution archive
+        run: ./ci/dist.sh
+      - name: Upload archives as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-archives
+          path: |
+            sysroot-Linux-riscv64emac.tar.zst
+            tools-Linux-x86_64.tar.zst
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
 
   setup-macos:
     name: Run setup script on MacOS
     timeout-minutes: 20
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Install dependencies
         run: ./ci/brew.sh
-      - name: Install rust-src
-        run: rustup component add rust-src
+      - name: Install Rust toolchain
+        run: |
+          rustup install ${{ env.RUST_VERSION }}
+          rustup default ${{ env.RUST_VERSION }}
+          rustup component add rust-src
       - name: Check that setup script works
         run: ./setup.sh
       - name: Check that our tools work
         run: ./ci/apps.sh
+      - name: Create distribution archive
+        run: ./ci/dist.sh
+      - name: Upload archives as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-archives
+          path: tools-Darwin-arm64.tar.zst
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
+
+  check-macos:
+    name: Check that sysroot produced on Linux works on MacOS
+    timeout-minutes: 20
+    runs-on: macos-15
+    needs: [setup-linux, setup-macos]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install dependencies
+        run: ./ci/brew.sh
+      - name: Install Rust toolchain
+        run: |
+          rustup install ${{ env.RUST_VERSION }}
+          rustup default ${{ env.RUST_VERSION }}
+          rustup component add rust-src
+      - name: Download Linux sysroot
+        uses: actions/download-artifact@v5
+        with:
+          name: linux-archives
+      - name: Download MacOS archives
+        uses: actions/download-artifact@v5
+        with:
+          name: macos-archives
+      - name: Unpack Linux sysroot and MacOS tools
+        run: |
+          ls -l
+          mkdir -p sysroot/bin
+          tar -C sysroot -xf sysroot-Linux-riscv64emac.tar.zst
+          tar -C sysroot/bin -xf tools-Darwin-arm64.tar.zst
+      - name: Build apps
+        run: ./ci/apps.sh
+
+  create-release:
+    name: Create binary release
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    needs: [check-macos]
+    if: github.ref_type == 'tag'
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - name: Download Linux archives
+        uses: actions/download-artifact@v5
+        with:
+          name: linux-archives
+      - name: Download MacOS archives
+        uses: actions/download-artifact@v5
+        with:
+          name: macos-archives
+      - name: Rename archives
+        run: |
+          ls -l
+          mv sysroot-Linux-riscv64emac.tar.zst sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
+          mv tools-Linux-x86_64.tar.zst tools-${{ env.VERSION }}-Linux-x86_64.tar.zst
+          mv tools-Darwin-arm64.tar.zst tools-${{ env.VERSION }}-Darwin-arm64.tar.zst
+      - name: Create release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.VERSION }}
+          release_name: Release ${{ env.VERSION }}
+          draft: true
+          prerelease: false
+      - name: Upload system root
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
+          asset_name: sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
+          asset_content_type: application/zstd
+      - name: Upload tools-Linux-x86_64.tar.zst
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: tools-${{ env.VERSION }}-Linux-x86_64.tar.zst
+          asset_name: tools-${{ env.VERSION }}-Linux-x86_64.tar.zst
+          asset_content_type: application/zstd
+      - name: Upload tools-Darwin-arm64.tar.zst
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: tools-${{ env.VERSION }}-Darwin-arm64.tar.zst
+          asset_name: tools-${{ env.VERSION }}-Darwin-arm64.tar.zst
+          asset_content_type: application/zstd

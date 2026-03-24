@@ -3,7 +3,7 @@ set -ex
 
 # Install dependencies.
 sudo -n apt-get -qq update
-sudo -n apt-get -qq install -y clang-20 lld-20 llvm-20 autotools-dev
+sudo -n apt-get -qq install -y clang-20 lld-20 llvm-20 autotools-dev xxd
 
 # Add new commands to PATH.
 bin=/usr/lib/llvm-20/bin

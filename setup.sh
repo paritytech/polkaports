@@ -40,12 +40,12 @@ cleanup() {
 
 polkatool_install() {
 	env RUSTFLAGS="$repro_rustflags" \
-		cargo install --quiet --root "$sysroot" polkatool@$polkatool_version
+		cargo install --quiet --root "$sysroot" "$@" polkatool@$polkatool_version
 }
 
 jam_program_blob_install() {
 	env RUSTFLAGS="$repro_rustflags" \
-		cargo install --quiet --root "$sysroot" jam-program-blob@$jam_program_blob_version
+		cargo install --quiet --root "$sysroot" "$@" jam-program-blob@$jam_program_blob_version
 }
 
 picoalloc_build() {
@@ -295,8 +295,13 @@ main() {
 	fi
 	sysroot="$root"/sysroot
 	sysroot_init
-	polkatool_install
-	jam_program_blob_install
+	if test -n "$TOOLS_RUST_TARGET"; then
+		polkatool_install --target "$TOOLS_RUST_TARGET"
+		jam_program_blob_install --target "$TOOLS_RUST_TARGET"
+	else
+		polkatool_install
+		jam_program_blob_install
+	fi
 	picoalloc_build
 	musl_build
 	musl_install
