@@ -2,7 +2,7 @@
 
 main() {
 	set -ex
-	. ./activate.sh
+	. ~/.corevm/env
 	root="$PWD"
 	workdir="$(mktemp -d)"
 	trap cleanup EXIT

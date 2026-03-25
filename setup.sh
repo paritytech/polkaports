@@ -40,19 +40,19 @@ cleanup() {
 
 polkatool_install() {
 	env RUSTFLAGS="$repro_rustflags" \
-		cargo install --quiet --root "$sysroot" "$@" polkatool@$polkatool_version
+		cargo install --quiet --root "$COREVM_HOME" "$@" polkatool@$polkatool_version
 }
 
 jam_program_blob_install() {
 	env RUSTFLAGS="$repro_rustflags" \
-		cargo install --quiet --root "$sysroot" "$@" jam-program-blob@$jam_program_blob_version
+		cargo install --quiet --root "$COREVM_HOME" "$@" jam-program-blob@$jam_program_blob_version
 }
 
 picoalloc_build() {
 	git clone --depth=1 --branch="$picoalloc_tag" --quiet "$picoalloc_url" "$workdir"/picoalloc
 	cd "$workdir"/picoalloc
 	rm -rf target
-	target_json="$("$sysroot"/bin/polkatool get-target-json-path)"
+	target_json="$("$COREVM_HOME"/bin/polkatool get-target-json-path)"
 	RUSTC_BOOTSTRAP=1 RUSTFLAGS="$repro_rustflags" \
 		cargo build \
 		-Zbuild-std=core,alloc \
@@ -119,10 +119,9 @@ linux_install() {
 }
 
 sysroot_init() {
-	rm -rf "$sysroot"/bin
-	mkdir -p "$sysroot"/bin
-	export COREVM_SYSROOT="$sysroot"
-	cat >"$sysroot"/bin/polkavm-cc <<'EOF'
+	rm -rf "$COREVM_HOME"/bin
+	mkdir -p "$COREVM_HOME"/bin
+	cat >"$COREVM_HOME"/bin/polkavm-cc <<'EOF'
 #!/bin/sh
 suffix=
 for x in "$@"; do
@@ -131,10 +130,10 @@ for x in "$@"; do
 	*) ;;
 	esac
 done
-exec "${COREVM_CC:-clang}" --config="$COREVM_SYSROOT"/clang$suffix.cfg "$@"
+exec "${COREVM_CC:-clang}" --config="$COREVM_HOME"/sysroot/etc/clang$suffix.cfg "$@"
 EOF
-	chmod +x "$sysroot"/bin/polkavm-cc
-	cat >"$sysroot"/bin/polkavm-c++ <<'EOF'
+	chmod +x "$COREVM_HOME"/bin/polkavm-cc
+	cat >"$COREVM_HOME"/bin/polkavm-c++ <<'EOF'
 #!/bin/sh
 suffix=
 for x in "$@"; do
@@ -143,24 +142,25 @@ for x in "$@"; do
 	*) ;;
 	esac
 done
-exec "${COREVM_CXX:-clang++}" --config="$COREVM_SYSROOT"/clang++$suffix.cfg "$@"
+exec "${COREVM_CXX:-clang++}" --config="$COREVM_HOME"/sysroot/etc/clang++$suffix.cfg "$@"
 EOF
-	chmod +x "$sysroot"/bin/polkavm-c++
-	cat >"$sysroot"/bin/polkavm-lld <<'EOF'
+	chmod +x "$COREVM_HOME"/bin/polkavm-c++
+	cat >"$COREVM_HOME"/bin/polkavm-lld <<'EOF'
 #!/bin/sh
 exec "${COREVM_LLD:-lld}" "$@" \
-    --sysroot="$COREVM_SYSROOT" \
-    -L"$COREVM_SYSROOT"/lib \
-    "$COREVM_SYSROOT"/lib/Scrt1.o \
-    "$COREVM_SYSROOT"/lib/crti.o \
-    "$COREVM_SYSROOT"/lib/crtn.o
+    --sysroot="$COREVM_HOME"/sysroot \
+    -L"$COREVM_HOME"/sysroot/lib \
+    "$COREVM_HOME"/sysroot/lib/Scrt1.o \
+    "$COREVM_HOME"/sysroot/lib/crti.o \
+    "$COREVM_HOME"/sysroot/lib/crtn.o
 EOF
-	chmod +x "$sysroot"/bin/polkavm-lld
-	ln -f "$root"/sdk/clang.cfg "$sysroot"/
-	ln -f "$root"/sdk/clang-nostdlib.cfg "$sysroot"/
-	ln -f "$root"/sdk/clang++.cfg "$sysroot"/
-	ln -f "$root"/sdk/clang++-nostdlib.cfg "$sysroot"/
-	ln -f "$root"/sdk/riscv64emac-corevm-linux-musl.json "$sysroot"/
+	chmod +x "$COREVM_HOME"/bin/polkavm-lld
+	mkdir -p "$sysroot"/etc
+	ln -f "$root"/sdk/clang.cfg "$sysroot"/etc/
+	ln -f "$root"/sdk/clang-nostdlib.cfg "$sysroot"/etc/
+	ln -f "$root"/sdk/clang++.cfg "$sysroot"/etc/
+	ln -f "$root"/sdk/clang++-nostdlib.cfg "$sysroot"/etc/
+	ln -f "$root"/sdk/riscv64emac-corevm-linux-musl.json "$sysroot"/etc/
 	# clang-18 and clang-19 on Ubuntu want libgcc
 	# clang-20 on Fedora wants libgcc_s
 	# busybox wants libgcc_eh
@@ -172,10 +172,10 @@ EOF
 	# CMake cross-compilation configuration.
 	cat >"$sysroot"/toolchain.cmake <<'EOF'
 set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_C_COMPILER $ENV{COREVM_SYSROOT}/bin/polkavm-cc)
-set(CMAKE_CXX_COMPILER $ENV{COREVM_SYSROOT}/bin/polkavm-c++)
-set(CMAKE_FIND_ROOT_PATH $ENV{COREVM_SYSROOT})
-set(CMAKE_SYSROOT $ENV{COREVM_SYSROOT})
+set(CMAKE_C_COMPILER $ENV{COREVM_HOME}/bin/polkavm-cc)
+set(CMAKE_CXX_COMPILER $ENV{COREVM_HOME}/bin/polkavm-c++)
+set(CMAKE_FIND_ROOT_PATH $ENV{COREVM_HOME}/sysroot)
+set(CMAKE_SYSROOT $ENV{COREVM_HOME}/sysroot)
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
@@ -285,15 +285,16 @@ run_single() {
 }
 
 main() {
-	PS4='$0:$LINENO: 🏗️  ' set -ex
+	set -ex
 	root="$PWD"
+	export COREVM_HOME="${COREVM_HOME:-$HOME/.corevm}"
 	workdir="$(mktemp -d)"
 	trap cleanup EXIT
 	if ! test -z ${1+x}; then
 		run_single "$1"
 		exit 0
 	fi
-	sysroot="$root"/sysroot
+	sysroot="$COREVM_HOME"/sysroot
 	sysroot_init
 	if test -n "$TOOLS_RUST_TARGET"; then
 		polkatool_install --target "$TOOLS_RUST_TARGET"
@@ -308,13 +309,18 @@ main() {
 	linux_install
 	libcxx_install
 	rm -rf "$sysroot"/share/man
-	cat <<'EOF'
+	cp crates/corevm-dist/env.sh "$COREVM_HOME"/env
+	case "$COREVM_HOME" in
+	"$HOME"/.corevm) dir="~/.corevm" ;;
+	*) dir="$COREVM_HOME" ;;
+	esac
+	cat <<EOF
 
 Setup finished!
 
 Type the following command to activate the toolchain.
 
-    . ./activate.sh
+    . $dir/env
 
 EOF
 }

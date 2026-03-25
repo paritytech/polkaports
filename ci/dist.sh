@@ -23,7 +23,7 @@ set_permissions() {
 	# Reproducible permissions.
 	find sysroot -type f -exec chmod 0644 \{\} \;
 	find sysroot -type l -exec chmod --no-dereference 0777 \{\} \;
-	find sysroot/bin -type f -exec chmod 0755 \{\} \;
+	find bin -type f -exec chmod 0755 \{\} \;
 	find sysroot/* -type d -exec chmod 0755 \{\} \;
 }
 
@@ -39,14 +39,14 @@ create_sysroot_archive() {
 		find . -type f -not -name '.*' -print0
 		find . -type d -not -name '.*' -print0
 		find . -type l -not -name '.*' -print0
-	} | grep -zv '^bin' | env LC_ALL=C sort --unique --zero-terminated >"$workdir"/files
+	} | env LC_ALL=C sort --unique --zero-terminated >"$workdir"/files
 	create_tar_archive "$workdir"/files "$root"/"$SYSROOT_FILENAME"
 	cd "$root"
 }
 
 create_tools_archive() {
 	# Resulting archive should be reproducible between CI job runs.
-	cd sysroot/bin
+	cd bin
 	{
 		# We only care about non-hidden files, directories and symbolic links.
 		find . -type f -not -name '.*' -print0
