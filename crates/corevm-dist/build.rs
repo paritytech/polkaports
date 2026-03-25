@@ -5,12 +5,17 @@ use std::{
 };
 
 const B2SUM_FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/b2sum.txt");
-const RELEASE_URL_FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/release-url.txt");
+const DEFAULT_RELEASE_URL: &str = concat!(
+	"https://github.com/paritytech/polkaports/releases/download/",
+	env!("CARGO_PKG_VERSION"),
+	"/"
+);
 
 fn main() {
+	println!("cargo::rerun-if-env-changed=COREVM_DIST_RELEASE_URL");
+	let release_url =
+		std::env::var("COREVM_DIST_RELEASE_URL").unwrap_or_else(|_| DEFAULT_RELEASE_URL.into());
 	let out_dir = std::env::var_os("OUT_DIR").unwrap();
-	let release_url = fs::read_to_string(RELEASE_URL_FILE).unwrap();
-	let release_url = release_url.trim();
 	let data = fs::read_to_string(B2SUM_FILE).unwrap();
 	let mut out_file =
 		BufWriter::new(fs::File::create(Path::new(&out_dir).join("archives.rs")).unwrap());
@@ -25,7 +30,6 @@ fn main() {
 		let filename = columns.next().unwrap();
 		let mut fields = filename.strip_suffix(".tar.zst").unwrap().split('-');
 		let name = fields.next().unwrap();
-		let _version = fields.next().unwrap();
 		let kernel = fields.next().unwrap();
 		let arch = fields.next().unwrap();
 		let archive = Archive {

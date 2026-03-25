@@ -54,11 +54,27 @@ fn write_env_file(prefix: &Path) -> anyhow::Result<()> {
 	Ok(())
 }
 
+#[cfg(feature = "reqwest")]
 fn download_file(url: &str, output_file: &Path) -> anyhow::Result<()> {
 	eprintln!("📥 Downloading {url}...");
 	let mut response = reqwest::blocking::get(url)?.error_for_status()?;
 	let mut file = fs::File::create(output_file)?;
 	response.copy_to(&mut file)?;
+	Ok(())
+}
+
+#[cfg(not(feature = "reqwest"))]
+fn download_file(url: &str, output_file: &Path) -> anyhow::Result<()> {
+	eprintln!("📥 Downloading {url}...");
+	let status = std::process::Command::new("curl")
+		.args(["--fail", "--location", "--silent", "--output"])
+		.arg(output_file)
+		.arg(url)
+		.status()
+		.map_err(|e| anyhow!("Failed to execute `curl`: {e}"))?;
+	if !status.success() {
+		return Err(anyhow!("Failed to execute `curl`: non-zero exit code"));
+	}
 	Ok(())
 }
 

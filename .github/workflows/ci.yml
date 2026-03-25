@@ -62,6 +62,8 @@ jobs:
         run: ./ci/apps.sh
       - name: Create distribution archive
         run: ./ci/dist.sh
+      - name: Check archives hashes
+        run: ./ci/check-b2sum.sh
       - name: Upload archives as artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -105,23 +107,34 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  check-macos:
-    name: Check that sysroot produced on Linux works on MacOS
+  check-corevm-dist:
+    name: Check that corevm-dist works on ${{ matrix.cfg.runs-on }}
+    runs-on: ${{ matrix.cfg.runs-on }}
     timeout-minutes: 20
-    runs-on: macos-15
     needs: [setup-linux, setup-macos]
+    strategy:
+      matrix:
+        cfg:
+          - runs-on: ubuntu-24.04
+            os: ubuntu
+          - runs-on: macos-15
+            os: macos
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Install dependencies
+        run: ./ci/apt.sh
+        if: ${{ matrix.cfg.os == 'ubuntu' }}
+      - name: Install dependencies
         run: ./ci/brew.sh
+        if: ${{ matrix.cfg.os == 'macos' }}
       - name: Install Rust toolchain
         run: |
           rustup install ${{ env.RUST_VERSION }}
           rustup default ${{ env.RUST_VERSION }}
           rustup component add rust-src
-      - name: Download Linux sysroot
+      - name: Download Linux archives
         uses: actions/download-artifact@v5
         with:
           name: linux-archives
@@ -129,14 +142,8 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: macos-archives
-      - name: Unpack Linux sysroot and MacOS tools
-        run: |
-          ls -l
-          mkdir sysroot bin
-          tar -C sysroot -xf sysroot-Linux-riscv64emac.tar.zst
-          tar -C bin -xf tools-Darwin-arm64.tar.zst
-      - name: Set COREVM_HOME
-        run: echo "$PWD" >>"$GITHUB_ENV"
+      - name: Install sysroot and tools via corevm-dist
+        run: ./ci/install-via-corevm-dist.sh
       - name: Build apps
         run: ./ci/apps.sh
 
@@ -144,7 +151,7 @@ jobs:
     name: Create binary release
     timeout-minutes: 20
     runs-on: ubuntu-24.04
-    needs: [check-macos]
+    needs: [check-corevm-dist]
     if: github.ref_type == 'tag'
     permissions:
       contents: write
@@ -159,13 +166,10 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: macos-archives
-      - name: Rename archives
-        run: |
-          ls -l
-          mv sysroot-Linux-riscv64emac.tar.zst sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
-          mv tools-Linux-x86_64.tar.zst tools-${{ env.VERSION }}-Linux-x86_64.tar.zst
-          mv tools-Darwin-arm64.tar.zst tools-${{ env.VERSION }}-Darwin-arm64.tar.zst
-          b2sum *.tar.zst | env LC_ALL=C sort
+      - name: Check archives hashes
+        run: ./ci/check-b2sum.sh
+      - name: Check corevm-dist version
+        run: ./ci/check-version.sh
       - name: Create release
         uses: actions/create-release@v1
         id: create_release
@@ -182,8 +186,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
-          asset_name: sysroot-${{ env.VERSION }}-Linux-riscv64emac.tar.zst
+          asset_path: sysroot-Linux-riscv64emac.tar.zst
+          asset_name: sysroot-Linux-riscv64emac.tar.zst
           asset_content_type: application/zstd
       - name: Upload tools-Linux-x86_64.tar.zst
         uses: actions/upload-release-asset@v1
@@ -191,8 +195,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: tools-${{ env.VERSION }}-Linux-x86_64.tar.zst
-          asset_name: tools-${{ env.VERSION }}-Linux-x86_64.tar.zst
+          asset_path: tools-Linux-x86_64.tar.zst
+          asset_name: tools-Linux-x86_64.tar.zst
           asset_content_type: application/zstd
       - name: Upload tools-Darwin-arm64.tar.zst
         uses: actions/upload-release-asset@v1
@@ -200,6 +204,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: tools-${{ env.VERSION }}-Darwin-arm64.tar.zst
-          asset_name: tools-${{ env.VERSION }}-Darwin-arm64.tar.zst
+          asset_path: tools-Darwin-arm64.tar.zst
+          asset_name: tools-Darwin-arm64.tar.zst
           asset_content_type: application/zstd
