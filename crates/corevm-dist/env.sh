@@ -1,8 +1,8 @@
-export COREVM_SYSROOT="$HOME"/.corevm-dist/sysroot
-# Prepend to PATH.
+corevm_home="${COREVM_HOME:-$HOME/.corevm}"
 case ":$PATH:" in
-*:"$HOME"/.corevm-dist/bin:*) ;;
+*:"$corevm_home"/bin:*) ;;
 *)
-	export PATH="$HOME"/.corevm-dist/bin:"$PATH"
+	export PATH="$corevm_home/bin${PATH:+:}$PATH"
 	;;
 esac
+unset corevm_home
