@@ -1,3 +1,4 @@
+#![doc(hidden)]
 use anyhow::anyhow;
 use clap::Parser;
 
@@ -35,15 +36,28 @@ fn default_prefix() -> anyhow::Result<PathBuf> {
 	Ok(home_dir.join(".corevm"))
 }
 
+pub enum PrefixKind {
+	Default,
+	Env,
+	Other,
+}
+
 fn main() -> anyhow::Result<()> {
 	let args = Args::parse();
 	match args.command {
 		Command::Install { prefix } => {
-			let prefix = match prefix {
-				Some(prefix) => prefix,
-				None => default_prefix()?,
+			let (prefix, prefix_kind) = match prefix {
+				Some(prefix) => {
+					let kind = if std::env::var_os("COREVM_HOME").is_some() {
+						PrefixKind::Env
+					} else {
+						PrefixKind::Other
+					};
+					(prefix, kind)
+				},
+				None => (default_prefix()?, PrefixKind::Default),
 			};
-			command::install(&prefix)?;
+			command::install(&prefix, prefix_kind)?;
 		},
 		Command::Update => command::update()?,
 	}

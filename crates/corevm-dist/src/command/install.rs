@@ -4,11 +4,11 @@ use tempfile::TempDir;
 
 use std::{ffi::OsString, path::Path};
 
-use crate::Archive;
+use crate::{Archive, PrefixKind};
 
 const ENV_SH: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/env.sh"));
 
-pub fn install(prefix: &Path) -> anyhow::Result<()> {
+pub fn install(prefix: &Path, prefix_kind: PrefixKind) -> anyhow::Result<()> {
 	let tmpdir = TempDir::new()?;
 	// System root.
 	let sysroot_archive = Archive::sysroot();
@@ -27,12 +27,21 @@ pub fn install(prefix: &Path) -> anyhow::Result<()> {
 	})?;
 	download_and_unpack(&tools_archive, &prefix.join("bin"), tmpdir.path())?;
 	write_env_file(prefix)?;
-	println!(
-        "\nDone!\n\n\
-        Type the following command to activate the toolchain.\n\n    . \"$HOME\"/.corevm-dist/env\n\n\
-        NOTE: Toolchain requires LLVM v20 (clang, clang++, lld) to work."
-    );
+	print_instructions(prefix, prefix_kind);
 	Ok(())
+}
+
+fn print_instructions(prefix: &Path, prefix_kind: PrefixKind) {
+	let in_shell_prefix = match prefix_kind {
+		PrefixKind::Default => "\"$HOME\"/.corevm/env".to_string(),
+		PrefixKind::Env => "\"$COREVM_HOME\"/env".to_string(),
+		PrefixKind::Other => format!("{:?}", prefix.join("env")),
+	};
+	println!(
+		"\nDone!\n\n\
+        Type the following command to activate the toolchain.\n\n    . {in_shell_prefix}\n\n\
+        NOTE: Toolchain requires LLVM v20 (clang, clang++, lld) to work.",
+	);
 }
 
 fn download_and_unpack(archive: &Archive, output_dir: &Path, tmpdir: &Path) -> anyhow::Result<()> {
@@ -67,7 +76,8 @@ fn download_file(url: &str, output_file: &Path) -> anyhow::Result<()> {
 fn download_file(url: &str, output_file: &Path) -> anyhow::Result<()> {
 	eprintln!("📥 Downloading {url}...");
 	let status = std::process::Command::new("curl")
-		.args(["--fail", "--location", "--silent", "--output"])
+		.stdin(std::process::Stdio::null())
+		.args(["--fail", "--location", "--output"])
 		.arg(output_file)
 		.arg(url)
 		.status()
