@@ -127,8 +127,6 @@ jobs:
       - name: Install dependencies
         run: ./ci/brew.sh
         if: ${{ matrix.cfg.os == 'macos' }}
-      - name: Check archives hashes
-        run: ./ci/check-b2sum.sh
       - name: Install Rust toolchain
         run: |
           rustup install ${{ env.RUST_VERSION }}
@@ -142,6 +140,8 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: macos-archives
+      - name: Check archive hashes
+        run: ./ci/check-b2sum.sh
       - name: Install sysroot and tools via corevm-dist
         run: ./ci/install-via-corevm-dist.sh
       - name: Build apps
@@ -166,7 +166,7 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: macos-archives
-      - name: Check archives hashes
+      - name: Check archive hashes
         run: ./ci/check-b2sum.sh
       - name: Check corevm-dist version
         run: ./ci/check-version.sh
