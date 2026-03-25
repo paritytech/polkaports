@@ -50,7 +50,7 @@ jobs:
           rustup default ${{ env.RUST_VERSION }}-x86_64-unknown-linux-gnu
           rustup component add rust-src
       - name: Set COREVM_HOME
-        run: echo "$PWD" >>"$GITHUB_ENV"
+        run: echo "COREVM_HOME=$PWD" >>"$GITHUB_ENV"
       - name: Check that setup script works
         run: ./setup.sh
       - name: Check that sysroot is reproducible
@@ -91,7 +91,7 @@ jobs:
           rustup default ${{ env.RUST_VERSION }}
           rustup component add rust-src
       - name: Set COREVM_HOME
-        run: echo "$PWD" >>"$GITHUB_ENV"
+        run: echo "COREVM_HOME=$PWD" >>"$GITHUB_ENV"
       - name: Check that setup script works
         run: ./setup.sh
       - name: Check that our tools work
