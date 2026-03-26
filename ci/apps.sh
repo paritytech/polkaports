@@ -2,7 +2,6 @@
 
 main() {
 	set -ex
-	. "$COREVM_HOME"/env
 	root="$PWD"
 	workdir="$(mktemp -d)"
 	trap cleanup EXIT

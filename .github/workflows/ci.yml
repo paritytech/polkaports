@@ -59,7 +59,9 @@ jobs:
           ./setup.sh
           ./ci/check-reproducible.sh sysroot.old sysroot
       - name: Check that our tools work
-        run: ./ci/apps.sh
+        run: |
+          . "$COREVM_HOME"/env
+          ./ci/apps.sh
       - name: Create distribution archive
         run: ./ci/dist.sh
       - name: Upload archives as artifacts
@@ -93,7 +95,9 @@ jobs:
       - name: Check that setup script works
         run: ./setup.sh
       - name: Check that our tools work
-        run: ./ci/apps.sh
+        run: |
+          . "$COREVM_HOME"/env
+          ./ci/apps.sh
       - name: Create distribution archive
         run: ./ci/dist.sh
       - name: Upload archives as artifacts
@@ -145,7 +149,9 @@ jobs:
       - name: Install sysroot and tools via corevm-dist
         run: ./ci/install-via-corevm-dist.sh
       - name: Build apps
-        run: ./ci/apps.sh
+        run: |
+          . $HOME/.corevm/env
+          ./ci/apps.sh
 
   create-release:
     name: Create binary release
