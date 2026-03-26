@@ -130,7 +130,7 @@ for x in "$@"; do
 	*) ;;
 	esac
 done
-exec "${COREVM_CC:-clang}" --config="$COREVM_HOME"/sysroot/etc/clang$suffix.cfg "$@"
+exec "${COREVM_CC:-clang}" --config="${COREVM_HOME:-$HOME/.corevm}"/sysroot/etc/clang$suffix.cfg "$@"
 EOF
 	chmod +x "$COREVM_HOME"/bin/polkavm-cc
 	cat >"$COREVM_HOME"/bin/polkavm-c++ <<'EOF'
@@ -142,17 +142,18 @@ for x in "$@"; do
 	*) ;;
 	esac
 done
-exec "${COREVM_CXX:-clang++}" --config="$COREVM_HOME"/sysroot/etc/clang++$suffix.cfg "$@"
+exec "${COREVM_CXX:-clang++}" --config="${COREVM_HOME:-$HOME/.corevm}"/sysroot/etc/clang++$suffix.cfg "$@"
 EOF
 	chmod +x "$COREVM_HOME"/bin/polkavm-c++
 	cat >"$COREVM_HOME"/bin/polkavm-lld <<'EOF'
 #!/bin/sh
+corevm_home="${COREVM_HOME:-$HOME/.corevm}"
 exec "${COREVM_LLD:-lld}" "$@" \
-    --sysroot="$COREVM_HOME"/sysroot \
-    -L"$COREVM_HOME"/sysroot/lib \
-    "$COREVM_HOME"/sysroot/lib/Scrt1.o \
-    "$COREVM_HOME"/sysroot/lib/crti.o \
-    "$COREVM_HOME"/sysroot/lib/crtn.o
+    --sysroot="$corevm_home"/sysroot \
+    -L"$corevm_home"/sysroot/lib \
+    "$corevm_home"/sysroot/lib/Scrt1.o \
+    "$corevm_home"/sysroot/lib/crti.o \
+    "$corevm_home"/sysroot/lib/crtn.o
 EOF
 	chmod +x "$COREVM_HOME"/bin/polkavm-lld
 	mkdir -p "$sysroot"/etc
@@ -172,6 +173,9 @@ EOF
 	# CMake cross-compilation configuration.
 	cat >"$sysroot"/toolchain.cmake <<'EOF'
 set(CMAKE_SYSTEM_NAME Linux)
+if(NOT DEFINED ENV{COREVM_HOME})
+    set(ENV{COREVM_HOME}, $ENV{HOME}/.corevm)
+endif()
 set(CMAKE_C_COMPILER $ENV{COREVM_HOME}/bin/polkavm-cc)
 set(CMAKE_CXX_COMPILER $ENV{COREVM_HOME}/bin/polkavm-c++)
 set(CMAKE_FIND_ROOT_PATH $ENV{COREVM_HOME}/sysroot)
