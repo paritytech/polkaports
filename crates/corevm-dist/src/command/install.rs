@@ -1,18 +1,22 @@
+use anstyle::{AnsiColor, Style};
 use anyhow::anyhow;
 use memmap2::Mmap;
-use tempfile::TempDir;
 
-use std::{ffi::OsString, path::Path};
+use std::{
+	ffi::OsString,
+	io::IsTerminal as _,
+	path::{Path, PathBuf},
+};
 
 use crate::{Archive, PrefixKind};
 
 const ENV_SH: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/env.sh"));
 
 pub fn install(prefix: &Path, prefix_kind: PrefixKind) -> anyhow::Result<()> {
-	let tmpdir = TempDir::new()?;
+	let download_dir = download_dir();
 	// System root.
 	let sysroot_archive = Archive::sysroot();
-	download_and_unpack(&sysroot_archive, &prefix.join("sysroot"), tmpdir.path())?;
+	download_and_unpack(&sysroot_archive, &prefix.join("sysroot"), &download_dir)?;
 	// Tools.
 	let tools_archive = Archive::find_tools().ok_or_else(|| {
 		use std::fmt::Write;
@@ -25,10 +29,17 @@ pub fn install(prefix: &Path, prefix_kind: PrefixKind) -> anyhow::Result<()> {
             Currently available archives:\n{available}"
 		)
 	})?;
-	download_and_unpack(&tools_archive, &prefix.join("bin"), tmpdir.path())?;
+	download_and_unpack(&tools_archive, &prefix.join("bin"), &download_dir)?;
 	write_env_file(prefix)?;
 	print_instructions(prefix, prefix_kind);
 	Ok(())
+}
+
+fn download_dir() -> PathBuf {
+	std::env::var_os("XDG_CACHE_HOME")
+		.map(PathBuf::from)
+		.or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cache")))
+		.unwrap_or_else(std::env::temp_dir)
 }
 
 fn print_instructions(prefix: &Path, prefix_kind: PrefixKind) {
@@ -37,18 +48,32 @@ fn print_instructions(prefix: &Path, prefix_kind: PrefixKind) {
 		PrefixKind::Env => "\"$COREVM_HOME\"/env".to_string(),
 		PrefixKind::Other => format!("{:?}", prefix.join("env")),
 	};
+	let warn = if std::io::stdout().is_terminal() {
+		Style::new().bold().fg_color(Some(AnsiColor::Yellow.into()))
+	} else {
+		Style::new()
+	};
 	println!(
 		"\nDone!\n\n\
         Type the following command to activate the toolchain.\n\n    . {in_shell_prefix}\n\n\
-        NOTE: Toolchain requires LLVM v20 (clang, clang++, lld) to work.",
+        {warn}NOTE{warn:#}: Toolchain requires LLVM v20 (clang, clang++, lld) to work.",
 	);
 }
 
-fn download_and_unpack(archive: &Archive, output_dir: &Path, tmpdir: &Path) -> anyhow::Result<()> {
-	let archive_file = tmpdir.join(archive.filename);
-	download_file(archive.url, &archive_file)?;
+fn download_and_unpack(
+	archive: &Archive,
+	output_dir: &Path,
+	download_dir: &Path,
+) -> anyhow::Result<()> {
+	let archive_file = download_dir.join(archive.filename);
+	let mut unpacked = false;
+	if archive_file.exists() {
+		unpacked = unpack_archive(&archive_file, &archive.hash, output_dir).is_ok();
+	}
+	if !unpacked {
+		download_file(archive.url, &archive_file)?;
+	}
 	unpack_archive(&archive_file, &archive.hash, output_dir)?;
-	fs::remove_file(&archive_file)?;
 	Ok(())
 }
 
