@@ -68,12 +68,13 @@ fn download_and_unpack(
 	let archive_file = download_dir.join(archive.filename);
 	let mut unpacked = false;
 	if archive_file.exists() {
-		unpacked = unpack_archive(&archive_file, &archive.hash, output_dir).is_ok();
+		unpacked = unpack_archive(&archive_file, &archive.hash, output_dir, false).is_ok();
 	}
 	if !unpacked {
+		fs::create_dir_all(download_dir)?;
 		download_file(archive.url, &archive_file)?;
 	}
-	unpack_archive(&archive_file, &archive.hash, output_dir)?;
+	unpack_archive(&archive_file, &archive.hash, output_dir, true)?;
 	Ok(())
 }
 
@@ -117,8 +118,11 @@ fn unpack_archive(
 	archive_file: &Path,
 	expected_hash: &[u8; 64],
 	output_dir: &Path,
+	verbose: bool,
 ) -> anyhow::Result<()> {
-	eprintln!("📦 Unpacking {archive_file:?} to {output_dir:?}...");
+	if verbose {
+		eprintln!("🔍 Verifying {archive_file:?}...");
+	}
 	let input_file = fs::File::open(archive_file)?;
 	let archive_data = unsafe { Mmap::map(&input_file)? };
 	let expected_hash = blake2b_simd::Hash::from(expected_hash);
@@ -133,6 +137,9 @@ fn unpack_archive(
 			expected_hash.to_hex(),
 			actual_hash.to_hex(),
 		))
+	}
+	if verbose {
+		eprintln!("📦 Unpacking {archive_file:?} to {output_dir:?}...");
 	}
 	let mut archive = tar::Archive::new(zstd::Decoder::new(&archive_data[..])?);
 	let output_dir_tmp = output_dir.parent().expect("Output directory has parent").join({

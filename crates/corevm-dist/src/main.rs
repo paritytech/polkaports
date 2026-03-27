@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 #![doc(hidden)]
 use anyhow::anyhow;
 use clap::Parser;
