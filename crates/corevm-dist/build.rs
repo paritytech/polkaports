@@ -32,14 +32,8 @@ fn main() {
 		let name = fields.next().unwrap();
 		let kernel = fields.next().unwrap();
 		let arch = fields.next().unwrap();
-		let archive = Archive {
-			url: format!("{release_url}{filename}"),
-			hash,
-			filename: filename.into(),
-			name: name.into(),
-			kernel: kernel.into(),
-			arch: arch.into(),
-		};
+		let archive =
+			Archive { url: format!("{release_url}{filename}"), hash, filename, name, kernel, arch };
 		writeln!(&mut out_file, "{archive:?},").unwrap();
 	}
 	writeln!(&mut out_file, "];").unwrap();
@@ -61,11 +55,11 @@ fn parse_hash(s: &str) -> [u8; 64] {
 
 #[derive(Debug)]
 #[allow(unused)]
-struct Archive {
+struct Archive<'a> {
 	url: String,
 	hash: [u8; 64],
-	filename: String,
-	name: String,
-	kernel: String,
-	arch: String,
+	filename: &'a str,
+	name: &'a str,
+	kernel: &'a str,
+	arch: &'a str,
 }
