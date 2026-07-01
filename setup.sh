@@ -40,12 +40,12 @@ cleanup() {
 
 polkatool_install() {
 	env RUSTFLAGS="$repro_rustflags" \
-		cargo install --quiet --root "$sysroot" "$@" polkatool@$polkatool_version
+		cargo install --quiet --root "$sysroot" --locked "$@" polkatool@$polkatool_version
 }
 
 jam_program_blob_install() {
 	env RUSTFLAGS="$repro_rustflags" \
-		cargo install --quiet --root "$sysroot" "$@" jam-program-blob@$jam_program_blob_version
+		cargo install --quiet --root "$sysroot" --locked "$@" jam-program-blob@$jam_program_blob_version
 }
 
 picoalloc_build() {
@@ -278,7 +278,7 @@ run_single() {
 		musl_install
 		;;
 	*)
-		printf "Uknown subcommand: '%s'\n" "$1"
+		printf "Unknown subcommand: '%s'\n" "$1"
 		return 1
 		;;
 	esac
