@@ -32,8 +32,6 @@
   "vendor": "corevm",
   "dynamic-linking": true,
   "only-cdylib": true,
-  "position-independent-executables": true,
-  "static-position-independent-executables": true,
   "relro-level": "full",
   "target-family": [
     "unix"
