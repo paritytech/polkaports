@@ -40,12 +40,12 @@ cleanup() {
 
 polkatool_install() {
 	env RUSTFLAGS="$repro_rustflags" \
-		cargo install --quiet --root "$COREVM_HOME" "$@" polkatool@$polkatool_version
+		cargo install --quiet --root "$COREVM_HOME" --locked "$@" polkatool@$polkatool_version
 }
 
 jam_program_blob_install() {
 	env RUSTFLAGS="$repro_rustflags" \
-		cargo install --quiet --root "$COREVM_HOME" "$@" jam-program-blob@$jam_program_blob_version
+		cargo install --quiet --root "$COREVM_HOME" --locked "$@" jam-program-blob@$jam_program_blob_version
 }
 
 picoalloc_build() {
