@@ -41,7 +41,7 @@ extern viddef_t vid; // global video state
 #define PALETTE_LEN (256 * 3)
 #define FRAME_LEN (BASEWIDTH * BASEHEIGHT)
 
-byte	vid_buffer[1 + PALETTE_LEN + FRAME_LEN];
+byte	vid_buffer[PALETTE_LEN + FRAME_LEN];
 short	zbuffer[FRAME_LEN];
 byte	surfcache[256*1024];
 
@@ -50,8 +50,7 @@ unsigned	d_8to24table[256];
 
 void	VID_SetPalette (unsigned char *palette)
 {
-    vid_buffer[0] = 1;
-    memcpy(vid_buffer + 1, palette, PALETTE_LEN);
+    memcpy(vid_buffer, palette, PALETTE_LEN);
 }
 
 void	VID_ShiftPalette (unsigned char *palette)
@@ -67,7 +66,7 @@ void	VID_Init (unsigned char *palette)
 	vid.numpages = 1;
 	memcpy(vid.colormap, host_colormap, 16384);
 	vid.fullbright = 256 - LittleLong (*((int *)vid.colormap + 2048));
-	vid.buffer = vid_buffer + 1 + PALETTE_LEN;
+	vid.buffer = vid_buffer + PALETTE_LEN;
 	vid.rowbytes = BASEWIDTH;
 	
 	d_pzbuffer = zbuffer;
@@ -78,7 +77,8 @@ void	VID_Init (unsigned char *palette)
         .width = vid.width,
         .height = vid.height,
         .refresh_rate = FRAMES_PER_SEC,
-        .format = COREVM_VIDEO_RGB88_INDEXED8,
+        .options = COREVM_VIDEO_MODE_QUANTIZATION_LEVEL(4)
+            | COREVM_VIDEO_MODE_CHROMA_SUBSAMPLING,
     };
     corevm_video_mode(&mode);
 }
@@ -101,7 +101,7 @@ static const float MOUSE_SENSITIVITY_Y = 0.15;
 
 void	VID_Update (vrect_t *rects)
 {
-    corevm_yield_video_frame(vid_buffer, 1 + PALETTE_LEN + FRAME_LEN);
+    corevm_yield_video_frame(vid_buffer, PALETTE_LEN + FRAME_LEN, COREVM_VIDEO_RGB88_INDEXED8);
     s_timestamp += (1.0 / FRAMES_PER_SEC_F);
 
     if (cls.demoplayback) {
