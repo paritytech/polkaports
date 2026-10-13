@@ -5,7 +5,7 @@ linux_url=https://github.com/torvalds/linux
 picoalloc_tag=v5.2.0
 picoalloc_url=https://github.com/koute/picoalloc
 polkatool_version=0.37.0
-jam_program_blob_version=0.1.26
+jam_program_blob_version=0.1.28
 llvm_tag=llvmorg-22.1.0
 llvm_url=https://github.com/llvm/llvm-project
 
