@@ -7,7 +7,7 @@
   "data-layout": "e-m:e-p:64:64-i64:64-i128:128-n32:64-S64",
   "eh-frame-header": false,
   "emit-debug-gdb-scripts": false,
-  "features": "+e,+m,+a,+c,+zbb,+auipc-addi-fusion,+ld-add-fusion,+lui-addi-fusion,+xtheadcondmov",
+  "features": "+e,+m,+a,+c,+zbb,+unaligned-scalar-mem,+auipc-addi-fusion,+ld-add-fusion,+lui-addi-fusion,+xtheadcondmov",
   "linker": "polkavm-lld",
   "linker-flavor": "ld.lld",
   "llvm-abiname": "lp64e",
@@ -15,7 +15,7 @@
   "max-atomic-width": 64,
   "panic-strategy": "abort",
   "relocation-model": "pie",
-  "target-pointer-width": "64",
+  "target-pointer-width": 64,
   "singlethread": true,
   "pre-link-args": {
     "ld": [
@@ -32,6 +32,8 @@
   "vendor": "corevm",
   "dynamic-linking": true,
   "only-cdylib": true,
+  "position-independent-executables": true,
+  "static-position-independent-executables": true,
   "relro-level": "full",
   "target-family": [
     "unix"
