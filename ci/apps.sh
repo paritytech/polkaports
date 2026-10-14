@@ -2,7 +2,6 @@
 
 main() {
 	set -ex
-	. ./activate.sh
 	root="$PWD"
 	workdir="$(mktemp -d)"
 	trap cleanup EXIT
@@ -35,7 +34,7 @@ build_rust_apps() {
 		run env RUSTC_BOOTSTRAP=1 \
 			cargo build \
 			--quiet \
-			--target="$COREVM_SYSROOT"/"$rust_target".json \
+			--target="$COREVM_HOME"/sysroot/etc/"$rust_target".json \
 			-Zbuild-std=core,alloc,std,panic_abort \
 			-Zbuild-std-features=panic_immediate_abort
 		polkatool link --min-stack-size "$rust_stack_size" \

@@ -18,7 +18,7 @@ Those wrappers require LLVM 20 toolchain to work properly.
 ./setup.sh
 
 # Activate (setup environment variables) the toolchain.
-. ./activate.sh
+. ~/.corevm/env
 ```
 
 
